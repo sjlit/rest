@@ -1,0 +1,60 @@
+package schema
+
+import (
+	"errors"
+	"net/http"
+)
+
+const (
+	TypeInteger = "integer"
+	TypeFloat   = "float"
+	TypeBoolean = "boolean"
+	TypeString  = "string"
+)
+
+const (
+	FormatInteger   = "integer"
+	FormatFloat     = "float"
+	FormatBoolean   = "boolean"
+	FormatString    = "string"
+	FormatText      = "text"
+	FormatDropdown  = "dropdown"
+	FormatDatetime  = "datetime"
+	FormatDate      = "date"
+	FormatTime      = "time"
+	FormatTimestamp = "timestamp"
+	FormatPassword  = "password"
+)
+
+const (
+	ScenarioCreate = "create"
+	ScenarioUpdate = "update"
+	ScenarioDelete = "delete"
+	ScenarioSearch = "search"
+	ScenarioExport = "export"
+	ScenarioImport = "import"
+	ScenarioList   = "list"
+	ScenarioDetail = "detail"
+)
+
+const (
+	MatchExactly = "exactly" //精确匹配
+	MatchFuzzy   = "fuzzy"   //模糊匹配
+)
+
+const (
+	LiveTypeDropdown = "dropdown"
+	LiveTypeCascader = "cascader"
+)
+
+var (
+	ErrMissingModuleName = errors.New("module name required")
+)
+
+var (
+	matchEnums           = []string{MatchExactly, MatchFuzzy}
+	readonlyScenario     = []string{ScenarioCreate, ScenarioUpdate}
+	requiredScenario     = []string{ScenarioCreate, ScenarioUpdate}
+	allowMethods         = []string{http.MethodPut, http.MethodPost}
+	timeSearchRangeEnums = []string{"minute", "hour", "day", "week", "month", "year"}
+)

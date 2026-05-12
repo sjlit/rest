@@ -1,0 +1,25 @@
+
+.vscode
+.idea
+.env.development
+
+bin/
+cmd/
+.svn/
+.godeps
+./build
+.cover/
+*.dat
+vendor
+node_modules
+cmd/__debug*
+
+*.o
+*.a
+*.so
+
+# Folders
+_obj
+_test
+.worktrees
+	
