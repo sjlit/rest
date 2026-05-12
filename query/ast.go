@@ -81,6 +81,12 @@ type Subquery struct {
 	Alias string
 }
 
+func NewSubquery(fn func(*Builder)) Subquery {
+	sub := NewBuilder()
+	fn(sub)
+	return Subquery{Spec: sub.spec}
+}
+
 // ---- QuerySpec ----
 
 type QuerySpec struct {

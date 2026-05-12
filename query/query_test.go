@@ -654,3 +654,46 @@ func TestParseOperator(t *testing.T) {
 		}
 	}
 }
+
+func TestSubqueryIn(t *testing.T) {
+	db := setupTestDB(t)
+	seedUsers(db)
+	seedOrders(db)
+	ctx := context.Background()
+
+	var users []testUser
+	b := NewBuilder().
+		Where("id", OpIn, NewSubquery(func(sb *Builder) {
+			sb.Select(Field("user_id")).From("test_orders").Where("amount", OpGt, 100)
+		}))
+	if err := New(db, nil, b).All(ctx, &users); err != nil {
+		t.Fatalf("All failed: %v", err)
+	}
+	if len(users) != 2 {
+		t.Errorf("expected 2 users with orders > 100, got %d", len(users))
+	}
+}
+
+func TestAggregateAndHaving(t *testing.T) {
+	db := setupTestDB(t)
+	seedOrders(db)
+	ctx := context.Background()
+
+	type result struct {
+		Status string
+		Total  float64
+	}
+
+	var results []result
+	b := NewBuilder().
+		Select(Field("status"), Sum("amount").As("total")).
+		From("test_orders").
+		GroupBy("status").
+		Having("total", OpGt, 100)
+	if err := New(db, nil, b).All(ctx, &results); err != nil {
+		t.Fatalf("All failed: %v", err)
+	}
+	if len(results) == 0 {
+		t.Error("expected aggregate results, got none")
+	}
+}
