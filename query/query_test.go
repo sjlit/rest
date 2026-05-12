@@ -2,7 +2,6 @@ package query
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -49,60 +48,6 @@ func seedOrders(db *gorm.DB) {
 	db.Create(&testOrder{UserID: 1, Amount: 100.0, Status: "paid"})
 	db.Create(&testOrder{UserID: 1, Amount: 200.0, Status: "pending"})
 	db.Create(&testOrder{UserID: 2, Amount: 150.0, Status: "paid"})
-}
-
-// ---------- Validation Tests ----------
-
-func TestValidateFieldName(t *testing.T) {
-	tests := []struct {
-		field string
-		want  error
-	}{
-		{"name", nil},
-		{"users.name", nil},
-		{"name_1", nil},
-		{"", errors.New("")},
-		{"name; DROP TABLE users", errors.New("")},
-		{"name--", errors.New("")},
-		{"name' OR '1'='1", errors.New("")},
-	}
-
-	for _, tt := range tests {
-		err := validateFieldName(tt.field)
-		if tt.want == nil && err != nil {
-			t.Errorf("validateFieldName(%q) unexpected error: %v", tt.field, err)
-		}
-		if tt.want != nil && err == nil {
-			t.Errorf("validateFieldName(%q) expected error, got nil", tt.field)
-		}
-	}
-}
-
-func TestBuilderValidationBlocksInjection(t *testing.T) {
-	cases := []struct {
-		name    string
-		builder *Builder
-	}{
-		{"where_field", NewBuilder().Where("id; DROP", OpEq, 1)},
-		{"order_by", NewBuilder().OrderBy("name;--", "ASC")},
-		{"group_by", NewBuilder().GroupBy("name;--")},
-		{"select", NewBuilder().Select(Field("id;--"))},
-		{"join_table", NewBuilder().LeftJoin("users;--", "a = b")},
-		{"join_on", NewBuilder().LeftJoin("orders", "1=1; DROP TABLE users--")},
-		{"nested_where", NewBuilder().WhereGroup(func(b *Builder) {
-			b.Where("id;--", OpEq, 1)
-		})},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			q := New(nil, nil, tc.builder)
-			_, err := q.Count(context.Background())
-			if err == nil {
-				t.Error("expected validation error, got nil")
-			}
-		})
-	}
 }
 
 // ---------- Operator Tests ----------

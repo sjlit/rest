@@ -6,23 +6,23 @@ import (
 	"strings"
 )
 
-var safeFieldNameV2 = regexp.MustCompile(`^[a-zA-Z0-9_\.]+$`)
+var safeFieldName = regexp.MustCompile(`^[a-zA-Z0-9_\.]+$`)
 
-func validateFieldNameV2(field string) error {
+func validateFieldName(field string) error {
 	if field == "" {
 		return fmt.Errorf("field name cannot be empty")
 	}
-	if !safeFieldNameV2.MatchString(field) {
+	if !safeFieldName.MatchString(field) {
 		return fmt.Errorf("invalid field name: %s", field)
 	}
 	return nil
 }
 
-func validateTableNameV2(table string) error {
+func validateTableName(table string) error {
 	if table == "" {
 		return fmt.Errorf("table name cannot be empty")
 	}
-	if !safeFieldNameV2.MatchString(table) {
+	if !safeFieldName.MatchString(table) {
 		return fmt.Errorf("invalid table name: %s", table)
 	}
 	return nil
@@ -52,11 +52,11 @@ func Validate(spec QuerySpec) error {
 	if spec.Source != nil {
 		switch s := spec.Source.(type) {
 		case TableSource:
-			if err := validateTableNameV2(string(s)); err != nil {
+			if err := validateTableName(string(s)); err != nil {
 				return err
 			}
 		case SubquerySource:
-			if err := validateTableNameV2(s.Subquery.Alias); err != nil {
+			if err := validateTableName(s.Subquery.Alias); err != nil {
 				return err
 			}
 			if err := Validate(s.Subquery.Spec); err != nil {
@@ -81,7 +81,7 @@ func Validate(spec QuerySpec) error {
 
 	// Joins
 	for _, j := range spec.Joins {
-		if err := validateTableNameV2(j.Table); err != nil {
+		if err := validateTableName(j.Table); err != nil {
 			return err
 		}
 		if err := validateJoinOn(j.On); err != nil {
@@ -91,14 +91,14 @@ func Validate(spec QuerySpec) error {
 
 	// OrderBy
 	for _, o := range spec.OrderBy {
-		if err := validateFieldNameV2(o.Field); err != nil {
+		if err := validateFieldName(o.Field); err != nil {
 			return err
 		}
 	}
 
 	// GroupBy
 	for _, g := range spec.GroupBy {
-		if err := validateFieldNameV2(g); err != nil {
+		if err := validateFieldName(g); err != nil {
 			return err
 		}
 	}
@@ -116,9 +116,9 @@ func Validate(spec QuerySpec) error {
 func validateExpr(e Expr) error {
 	switch ex := e.(type) {
 	case FieldExpr:
-		return validateFieldNameV2(ex.Name)
+		return validateFieldName(ex.Name)
 	case AggregateExpr:
-		if err := validateFieldNameV2(ex.Field); err != nil {
+		if err := validateFieldName(ex.Field); err != nil {
 			return err
 		}
 		if !allowedAggregates[ex.Function] {
@@ -140,7 +140,7 @@ func validateExpr(e Expr) error {
 func validateClause(clause Clause) error {
 	switch c := clause.(type) {
 	case Condition:
-		if err := validateFieldNameV2(c.Field); err != nil {
+		if err := validateFieldName(c.Field); err != nil {
 			return err
 		}
 		if sub, ok := c.Value.(Subquery); ok {

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestValidateFieldNameV2(t *testing.T) {
+func TestValidateFieldName(t *testing.T) {
 	tests := []struct {
 		field string
 		want  error
@@ -20,12 +20,12 @@ func TestValidateFieldNameV2(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		err := validateFieldNameV2(tt.field)
+		err := validateFieldName(tt.field)
 		if tt.want == nil && err != nil {
-			t.Errorf("validateFieldNameV2(%q) unexpected error: %v", tt.field, err)
+			t.Errorf("validateFieldName(%q) unexpected error: %v", tt.field, err)
 		}
 		if tt.want != nil && err == nil {
-			t.Errorf("validateFieldNameV2(%q) expected error, got nil", tt.field)
+			t.Errorf("validateFieldName(%q) expected error, got nil", tt.field)
 		}
 	}
 }
