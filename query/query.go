@@ -50,6 +50,8 @@ const (
 	OpBetween   Operator = "BETWEEN"
 	OpIsNull    Operator = "IS NULL"
 	OpIsNotNull Operator = "IS NOT NULL"
+	OpExists    Operator = "EXISTS"
+	OpNotExists Operator = "NOT EXISTS"
 )
 
 // ParseOperator maps common operator strings to typed Operator constants.
@@ -215,49 +217,70 @@ func (q *Query) Page(ctx context.Context, page, size int, dest any) (int64, erro
 // ---- Compilation ----
 
 func (q *Query) compile(ctx context.Context) (*gorm.DB, error) {
-	if err := q.builder.validate(); err != nil {
-		return nil, err
-	}
-
 	db := q.db.WithContext(ctx)
 
-	if q.builder.table != "" {
-		db = db.Table(q.builder.table)
-	} else if q.model != nil {
-		db = db.Model(q.model)
+	switch src := q.builder.spec.Source.(type) {
+	case TableSource:
+		db = db.Table(string(src))
+	default:
+		if q.model != nil {
+			db = db.Model(q.model)
+		}
 	}
 
-	for _, j := range q.builder.joins {
+	for _, j := range q.builder.spec.Joins {
 		joinSQL := fmt.Sprintf("%s JOIN %s ON %s", j.Direction, j.Table, j.On)
 		db = db.Joins(joinSQL, j.Args...)
 	}
 
-	db, err := compileClauses(db, q.builder.clauses)
+	db, err := compileClauses(db, q.builder.spec.Where)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(q.builder.selects) > 0 {
-		db = db.Select(q.builder.selects)
+	if len(q.builder.spec.Selects) > 0 {
+		var selects []string
+		for _, expr := range q.builder.spec.Selects {
+			selects = append(selects, compileExpr(expr))
+		}
+		db = db.Select(selects)
 	}
-	if len(q.builder.orderBy) > 0 {
-		for _, o := range q.builder.orderBy {
+	if len(q.builder.spec.OrderBy) > 0 {
+		for _, o := range q.builder.spec.OrderBy {
 			db = db.Order(fmt.Sprintf("%s %s", o.Field, o.Direction))
 		}
 	}
-	if len(q.builder.groupBy) > 0 {
-		for _, g := range q.builder.groupBy {
+	if len(q.builder.spec.GroupBy) > 0 {
+		for _, g := range q.builder.spec.GroupBy {
 			db = db.Group(g)
 		}
 	}
-	if q.builder.offset > 0 {
-		db = db.Offset(q.builder.offset)
+	if q.builder.spec.Offset > 0 {
+		db = db.Offset(q.builder.spec.Offset)
 	}
-	if q.builder.limit > 0 {
-		db = db.Limit(q.builder.limit)
+	if q.builder.spec.Limit > 0 {
+		db = db.Limit(q.builder.spec.Limit)
 	}
 
 	return db, nil
+}
+
+func compileExpr(expr Expr) string {
+	switch e := expr.(type) {
+	case FieldExpr:
+		return e.Name
+	case AliasedExpr:
+		return fmt.Sprintf("%s AS %s", compileExpr(e.Expr), e.Alias)
+	case AggregateExpr:
+		if e.Alias != "" {
+			return fmt.Sprintf("%s(%s) AS %s", e.Function, e.Field, e.Alias)
+		}
+		return fmt.Sprintf("%s(%s)", e.Function, e.Field)
+	case RawExpr:
+		return e.SQL
+	default:
+		return ""
+	}
 }
 
 func compileClauses(db *gorm.DB, clauses []Clause) (*gorm.DB, error) {

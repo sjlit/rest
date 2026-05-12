@@ -86,7 +86,7 @@ func TestBuilderValidationBlocksInjection(t *testing.T) {
 		{"where_field", NewBuilder().Where("id; DROP", OpEq, 1)},
 		{"order_by", NewBuilder().OrderBy("name;--", "ASC")},
 		{"group_by", NewBuilder().GroupBy("name;--")},
-		{"select", NewBuilder().Select("id;--")},
+		{"select", NewBuilder().Select(Field("id;--"))},
 		{"join_table", NewBuilder().LeftJoin("users;--", "a = b")},
 		{"join_on", NewBuilder().LeftJoin("orders", "1=1; DROP TABLE users--")},
 		{"nested_where", NewBuilder().WhereGroup(func(b *Builder) {
@@ -465,7 +465,7 @@ func TestLeftJoin(t *testing.T) {
 
 	var results []result
 	b := NewBuilder().
-		Select("test_users.name", "test_orders.amount").
+		Select(Field("test_users.name"), Field("test_orders.amount")).
 		From("test_users").
 		LeftJoin("test_orders", "test_users.id = test_orders.user_id")
 	if err := New(db, nil, b).All(ctx, &results); err != nil {
@@ -489,7 +489,7 @@ func TestInnerJoin(t *testing.T) {
 
 	var results []result
 	b := NewBuilder().
-		Select("test_users.name", "test_orders.amount").
+		Select(Field("test_users.name"), Field("test_orders.amount")).
 		From("test_users").
 		InnerJoin("test_orders", "test_users.id = test_orders.user_id")
 	if err := New(db, nil, b).All(ctx, &results); err != nil {
@@ -613,7 +613,7 @@ func TestChaining(t *testing.T) {
 
 	var users []testUser
 	b := NewBuilder().
-		Select("name", "age").
+		Select(Field("name"), Field("age")).
 		Where("age", OpGte, 25).
 		OrderBy("age", "DESC").
 		Limit(2)
@@ -669,7 +669,7 @@ func TestGroupBy(t *testing.T) {
 
 	var results []result
 	b := NewBuilder().
-		Select("age").
+		Select(Field("age")).
 		GroupBy("age").
 		OrderBy("age", "ASC")
 	if err := New(db, &testUser{}, b).All(ctx, &results); err != nil {
