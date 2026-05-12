@@ -65,12 +65,6 @@ func ParseOperator(s string) Operator {
 	}
 }
 
-// ActiveQuery allows models to hook into query building.
-type ActiveQuery interface {
-	BeforeQuery(ctx context.Context, query *Query) error
-	AfterQuery(ctx context.Context, query *Query) error
-}
-
 type Condition struct {
 	Field string
 	Op    Operator

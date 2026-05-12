@@ -122,7 +122,7 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model T) (diffAtt
 		PrimaryKeyValue: primaryKey,
 		Context:         m.ctx,
 	})
-	m.GetDB().WithContext(childCtx).Transaction(func(tx *gorm.DB) error {
+	err = m.GetDB().WithContext(childCtx).Transaction(func(tx *gorm.DB) error {
 		previousModel := reflect.New(reflect.Indirect(reflect.ValueOf(model)).Type()).Interface()
 		if errTx := tx.Where(map[string]any{m.primaryKey: primaryKey}).First(previousModel).Error; errTx != nil {
 			err = errTx
