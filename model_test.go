@@ -16,28 +16,6 @@ type pagingUser struct {
 	Age  int    `json:"age"`
 }
 
-func setupPagingModel(t *testing.T) *Model[pagingUser] {
-	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to open db: %v", err)
-	}
-	if err := db.AutoMigrate(&schema.Schema{}); err != nil {
-		t.Fatalf("failed to migrate schemas table: %v", err)
-	}
-	ctx := context.Background()
-	model, err := NewModel[pagingUser](ctx, WithDB(db), WithModuleName("paging_test"))
-	if err != nil {
-		t.Fatalf("failed to create model: %v", err)
-	}
-	// Seed
-	db.Create(&pagingUser{Name: "Alice", Age: 30})
-	db.Create(&pagingUser{Name: "Bob", Age: 25})
-	db.Create(&pagingUser{Name: "Charlie", Age: 35})
-	db.Create(&pagingUser{Name: "Diana", Age: 28})
-	return model
-}
-
 func setupPagingModelWithCleanup(t *testing.T) (*Model[pagingUser], func()) {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})

@@ -336,39 +336,6 @@ func (m *Model[T]) Cursor(ctx context.Context, cursor string, limit int, queryBu
 	}, nil
 }
 
-func (m *Model[T]) Find(ctx context.Context, offset, limit int, queryBuilder *query.Builder) (totalCount int64, values []*T, err error) {
-	if !m.HasScenario(schema.ScenarioSearch) {
-		return 0, nil, ErrPermissionDenied
-	}
-	var (
-		model   T
-		schemas []schema.Schema
-	)
-	if schemas, err = schema.GetVisibleSchemas(ctx, m.GetDB(), m.naming.ModuleName, m.naming.TableName, schema.ScenarioList); err != nil {
-		return
-	}
-	childCtx := WithRuntimeScope(ctx, &RuntimeScope{
-		ModuleName: m.naming.ModuleName,
-		TableName:  m.naming.TableName,
-		Scenario:   schema.ScenarioList,
-		Schemas:    schemas,
-		Context:    m.ctx,
-	})
-	search := query.New(m.GetDB(), model, queryBuilder)
-	search.Builder().Offset(0).Limit(0)
-	if totalCount, err = search.
-		Count(childCtx); err != nil {
-		return
-	}
-	search.Builder().Offset(offset).Limit(limit)
-	values = make([]*T, 0)
-	if err = search.
-		All(childCtx, &values); err != nil {
-		return
-	}
-	return
-}
-
 func NewModel[T any](ctx context.Context, opts ...Option) (v *Model[T], err error) {
 	v = &Model[T]{
 		opts: newOptions(opts...),
