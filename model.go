@@ -273,6 +273,10 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model T) (diffAtt
 			}
 		}
 		if len(updates) > 0 {
+			if errTx = m.runBeforeHooks(ctx, tx, &model,
+				m.globalHooks.beforeUpdate, m.localHooks.beforeUpdate); errTx != nil {
+				return errTx
+			}
 			if errTx = tx.Model(model).
 				Where(map[string]any{m.primaryKey: primaryKey}).
 				Updates(updates).Error; errTx != nil {
@@ -296,6 +300,10 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model T) (diffAtt
 	if err != nil {
 		return nil, err
 	}
+	m.runAfterHooks(ctx, m.GetDB(), &model, diffAttrs,
+		m.globalHooks.afterUpdate, m.localHooks.afterUpdate)
+	m.runAfterHooks(ctx, m.GetDB(), &model, diffAttrs,
+		m.globalHooks.afterSaved, m.localHooks.afterSaved)
 	if au, ok := any(&model).(AfterUpdated); ok {
 		au.AfterUpdated(ctx, m.GetDB(), diffAttrs)
 	}
