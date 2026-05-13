@@ -697,3 +697,25 @@ func TestAggregateAndHaving(t *testing.T) {
 		t.Error("expected aggregate results, got none")
 	}
 }
+
+func TestCountDoesNotMutateBuilder(t *testing.T) {
+	db := setupTestDB(t)
+	seedUsers(db)
+	ctx := context.Background()
+
+	b := NewBuilder().Where("age", OpGte, 25).Limit(2).Offset(1)
+	q := New(db, &testUser{}, b)
+
+	_, err := q.Count(ctx)
+	if err != nil {
+		t.Fatalf("Count failed: %v", err)
+	}
+
+	// Builder should remain untouched
+	if b.Spec().Limit != 2 {
+		t.Errorf("builder limit mutated by Count: expected 2, got %d", b.Spec().Limit)
+	}
+	if b.Spec().Offset != 1 {
+		t.Errorf("builder offset mutated by Count: expected 1, got %d", b.Spec().Offset)
+	}
+}

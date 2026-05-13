@@ -118,7 +118,11 @@ func (q *Query) Builder() *Builder {
 }
 
 func (q *Query) Count(ctx context.Context) (int64, error) {
-	db, err := q.compile(ctx)
+	spec := q.builder.Spec().Clone()
+	spec.Offset = 0
+	spec.Limit = 0
+
+	db, err := q.compileWithSpec(ctx, spec)
 	if err != nil {
 		return 0, err
 	}
@@ -163,15 +167,17 @@ func (q *Query) Page(ctx context.Context, page, size int, dest any) (int64, erro
 }
 
 func (q *Query) compile(ctx context.Context) (*gorm.DB, error) {
-	if err := Validate(q.builder.Spec()); err != nil {
+	return q.compileWithSpec(ctx, q.builder.Spec())
+}
+
+func (q *Query) compileWithSpec(ctx context.Context, spec QuerySpec) (*gorm.DB, error) {
+	if err := Validate(spec); err != nil {
 		return nil, err
 	}
-
 	db := q.db.WithContext(ctx)
 	if q.model != nil {
 		db = db.Model(q.model)
 	}
-
 	compiler := NewCompiler()
-	return compiler.Compile(q.builder.Spec(), db)
+	return compiler.Compile(spec, db)
 }
