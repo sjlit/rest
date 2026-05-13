@@ -263,12 +263,11 @@ func (r *Resource[T]) Detail(res http.ResponseWriter, req *http.Request) {
 
 func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
 	var (
-		err         error
-		pageIndex   int
-		pageSize    int
-		totalCount  int64
-		modelValues []*T
-		schemas     []schema.Schema
+		err        error
+		pageIndex  int
+		pageSize   int
+		schemas    []schema.Schema
+		result     *PageResult[T]
 	)
 	pageIndex, _ = strconv.Atoi(req.URL.Query().Get("page"))
 	pageSize, _ = strconv.Atoi(req.URL.Query().Get("page_size"))
@@ -286,19 +285,12 @@ func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	queryBuilder := r.buildQuery(req, schemas)
-	if totalCount, modelValues, err = r.model.Find(req.Context(), pageIndex*pageSize, pageSize, queryBuilder); err != nil {
+	if result, err = r.model.Paginate(req.Context(), pageIndex+1, pageSize, queryBuilder); err != nil {
 		r.Respond(res, req, ErrUnavailable)
 		return
 	}
-	result := &SearchResult{
-		Page:       pageIndex,
-		PageSize:   pageSize,
-		TotalCount: totalCount,
-	}
 	if r.formatter != nil {
-		result.Data = r.formatter.FormatModels(req.Context(), modelValues, schemas, r.model.GetDB().Statement, "")
-	} else {
-		result.Data = modelValues
+		result.Data = r.formatter.FormatModels(req.Context(), result.Data, schemas, r.model.GetDB().Statement, "").([]*T)
 	}
 	r.Respond(res, req, result)
 }
