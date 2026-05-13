@@ -319,18 +319,29 @@ func (m *Model[T]) Delete(ctx context.Context, primaryKeyValue any) (err error) 
 	}
 	var model T
 	err = m.GetDB().WithContext(ctx).Transaction(func(tx *gorm.DB) (errTx error) {
-		errTx = tx.Model(model).Delete(map[string]any{
-			m.primaryKey: primaryKeyValue,
-		}).Error
-		if errTx != nil {
+		// 先查询完整记录
+		if errTx = tx.Where(map[string]any{m.primaryKey: primaryKeyValue}).First(&model).Error; errTx != nil {
 			return errTx
 		}
 
-		return nil
+		// BeforeDelete hooks
+		if errTx = m.runBeforeHooks(ctx, tx, &model,
+			m.globalHooks.beforeDelete, m.localHooks.beforeDelete); errTx != nil {
+			return errTx
+		}
+
+		errTx = tx.Delete(&model).Error
+		return
 	})
 	if err != nil {
 		return
 	}
+
+	// AfterDelete hooks
+	m.runAfterDeleteHooks(ctx, m.GetDB(), &model,
+		m.globalHooks.afterDelete, m.localHooks.afterDelete)
+
+	// 兼容现有接口式 hook
 	if ad, ok := any(&model).(AfterDeleted); ok {
 		ad.AfterDeleted(ctx, m.GetDB())
 	}
