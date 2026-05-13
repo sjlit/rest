@@ -30,10 +30,12 @@ func decodeCursor(cursor string) (int, error) {
 }
 
 type Model[T any] struct {
-	db         *gorm.DB
-	opts       *options
-	naming     Naming
-	primaryKey string
+	db          *gorm.DB
+	opts        *options
+	naming      Naming
+	primaryKey  string
+	globalHooks *modelHooks // NewModel 时从全局注册表快照
+	localHooks  *modelHooks // 实例级追加
 }
 
 func (m *Model[T]) GetDB() *gorm.DB {
@@ -79,6 +81,104 @@ func (m *Model[T]) GetFieldValue(refValue reflect.Value, column string) any {
 		targetValue = targetValue.Field(i)
 	}
 	return targetValue.Interface()
+}
+
+func (m *Model[T]) RegisterBeforeCreate(fn BeforeCreateHook[T]) {
+	m.initLocalHooks()
+	m.localHooks.beforeCreate = append(m.localHooks.beforeCreate, wrapBeforeHook(fn))
+}
+
+func (m *Model[T]) RegisterAfterCreate(fn AfterCreateHook[T]) {
+	m.initLocalHooks()
+	m.localHooks.afterCreate = append(m.localHooks.afterCreate, wrapAfterHook(fn))
+}
+
+func (m *Model[T]) RegisterBeforeUpdate(fn BeforeUpdateHook[T]) {
+	m.initLocalHooks()
+	m.localHooks.beforeUpdate = append(m.localHooks.beforeUpdate, wrapBeforeHook(fn))
+}
+
+func (m *Model[T]) RegisterAfterUpdate(fn AfterUpdateHook[T]) {
+	m.initLocalHooks()
+	m.localHooks.afterUpdate = append(m.localHooks.afterUpdate, wrapAfterHook(fn))
+}
+
+func (m *Model[T]) RegisterAfterSaved(fn AfterSavedHook[T]) {
+	m.initLocalHooks()
+	m.localHooks.afterSaved = append(m.localHooks.afterSaved, wrapAfterHook(fn))
+}
+
+func (m *Model[T]) RegisterBeforeDelete(fn BeforeDeleteHook[T]) {
+	m.initLocalHooks()
+	m.localHooks.beforeDelete = append(m.localHooks.beforeDelete, wrapBeforeHook(fn))
+}
+
+func (m *Model[T]) RegisterAfterDelete(fn AfterDeleteHook[T]) {
+	m.initLocalHooks()
+	m.localHooks.afterDelete = append(m.localHooks.afterDelete, wrapAfterDeleteHook(fn))
+}
+
+func (m *Model[T]) initLocalHooks() {
+	if m.localHooks == nil {
+		m.localHooks = &modelHooks{}
+	}
+}
+
+func (m *Model[T]) runBeforeHooks(
+	ctx context.Context,
+	db *gorm.DB,
+	model *T,
+	globalFns, localFns []erasedBeforeHookFunc,
+) error {
+	for _, fns := range [][]erasedBeforeHookFunc{globalFns, localFns} {
+		for _, fn := range fns {
+			if err := fn(ctx, db, model); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (m *Model[T]) runAfterHooks(
+	ctx context.Context,
+	db *gorm.DB,
+	model *T,
+	diffAttrs []*DiffAttr,
+	globalFns, localFns []erasedAfterHookFunc,
+) {
+	for _, fns := range [][]erasedAfterHookFunc{globalFns, localFns} {
+		for _, fn := range fns {
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						// 记录 panic，不阻断主流程
+					}
+				}()
+				fn(ctx, db, model, diffAttrs)
+			}()
+		}
+	}
+}
+
+func (m *Model[T]) runAfterDeleteHooks(
+	ctx context.Context,
+	db *gorm.DB,
+	model *T,
+	globalFns, localFns []erasedAfterDeleteHookFunc,
+) {
+	for _, fns := range [][]erasedAfterDeleteHookFunc{globalFns, localFns} {
+		for _, fn := range fns {
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						// 记录 panic，不阻断主流程
+					}
+				}()
+				fn(ctx, db, model)
+			}()
+		}
+	}
 }
 
 func (m *Model[T]) Create(ctx context.Context, model *T) (diffAttrs []*DiffAttr, err error) {
@@ -325,5 +425,19 @@ func NewModel[T any](opts ...Option) (v *Model[T], err error) {
 	v.naming.Pluralize = inflector.Pluralize(v.naming.TableName)
 	v.naming.Singular = singularizeTable
 	v.naming.ModuleName = v.opts.moduleName
+
+	// 快照：复制全局 hooks 到实例
+	globalMu.RLock()
+	v.globalHooks = &modelHooks{
+		beforeCreate: append([]erasedBeforeHookFunc(nil), globalBeforeCreate...),
+		afterCreate:  append([]erasedAfterHookFunc(nil), globalAfterCreate...),
+		beforeUpdate: append([]erasedBeforeHookFunc(nil), globalBeforeUpdate...),
+		afterUpdate:  append([]erasedAfterHookFunc(nil), globalAfterUpdate...),
+		afterSaved:   append([]erasedAfterHookFunc(nil), globalAfterSaved...),
+		beforeDelete: append([]erasedBeforeHookFunc(nil), globalBeforeDelete...),
+		afterDelete:  append([]erasedAfterDeleteHookFunc(nil), globalAfterDelete...),
+	}
+	globalMu.RUnlock()
+
 	return
 }
