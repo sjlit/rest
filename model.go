@@ -2,8 +2,10 @@ package rest
 
 import (
 	"context"
+	"encoding/base64"
 	"reflect"
 	"slices"
+	"strconv"
 
 	"git.nobla.cn/golang/rest/internal/inflector"
 	"git.nobla.cn/golang/rest/query"
@@ -11,6 +13,21 @@ import (
 	"gorm.io/gorm"
 	gormSchema "gorm.io/gorm/schema"
 )
+
+func encodeCursor(offset int) string {
+	return base64.StdEncoding.EncodeToString([]byte(strconv.Itoa(offset)))
+}
+
+func decodeCursor(cursor string) (int, error) {
+	if cursor == "" {
+		return 0, nil
+	}
+	b, err := base64.StdEncoding.DecodeString(cursor)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(string(b))
+}
 
 type Model[T any] struct {
 	ctx        context.Context
@@ -205,6 +222,57 @@ func (m *Model[T]) Detail(ctx context.Context, primaryKey any) (model *T, err er
 		return
 	}
 	return &modelValue, nil
+}
+
+func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *query.Builder) ([]*T, error) {
+	if !m.HasScenario(schema.ScenarioSearch) {
+		return nil, ErrPermissionDenied
+	}
+	var (
+		model   T
+		schemas []schema.Schema
+		err     error
+	)
+	if schemas, err = schema.GetVisibleSchemas(ctx, m.GetDB(), m.naming.ModuleName, m.naming.TableName, schema.ScenarioList); err != nil {
+		return nil, err
+	}
+	childCtx := WithRuntimeScope(ctx, &RuntimeScope{
+		ModuleName: m.naming.ModuleName,
+		TableName:  m.naming.TableName,
+		Scenario:   schema.ScenarioList,
+		Schemas:    schemas,
+		Context:    m.ctx,
+	})
+
+	listBuilder := queryBuilder.Clone()
+	if offset >= 0 {
+		listBuilder.Offset(offset)
+	}
+	if limit > 0 {
+		listBuilder.Limit(limit)
+	}
+
+	search := query.New(m.GetDB(), model, listBuilder)
+	values := make([]*T, 0)
+	if err = search.All(childCtx, &values); err != nil {
+		return nil, err
+	}
+	return values, nil
+}
+
+func (m *Model[T]) Count(ctx context.Context, queryBuilder *query.Builder) (int64, error) {
+	if !m.HasScenario(schema.ScenarioSearch) {
+		return 0, ErrPermissionDenied
+	}
+	var model T
+	childCtx := WithRuntimeScope(ctx, &RuntimeScope{
+		ModuleName: m.naming.ModuleName,
+		TableName:  m.naming.TableName,
+		Scenario:   schema.ScenarioList,
+		Context:    m.ctx,
+	})
+	search := query.New(m.GetDB(), model, queryBuilder)
+	return search.Count(childCtx)
 }
 
 func (m *Model[T]) Find(ctx context.Context, offset, limit int, queryBuilder *query.Builder) (totalCount int64, values []*T, err error) {
