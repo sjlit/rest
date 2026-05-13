@@ -461,6 +461,9 @@ func NewModel[T any](opts ...Option) (v *Model[T], err error) {
 	v.naming.Singular = singularizeTable
 	v.naming.ModuleName = v.opts.moduleName
 
+	// 初始化局部 hooks（避免 nil pointer）
+	v.localHooks = &modelHooks{}
+
 	// 快照：复制全局 hooks 到实例
 	globalMu.RLock()
 	v.globalHooks = &modelHooks{
