@@ -295,28 +295,6 @@ func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
 	r.Respond(res, req, result)
 }
 
-// func (r *Resource[T]) Export(res http.ResponseWriter, req *http.Request) {
-// 	var (
-// 		err         error
-// 		schemas     []schema.Schema
-// 		modelValues []*T
-// 	)
-// 	if err = r.model.Delete(req.Context(), 0); err != nil {
-// 		r.Respond(res, req, ErrCreateFailed)
-// 	}
-// 	if schemas, err = schema.GetVisibleSchemas(req.Context(), r.model.GetDB(), r.model.GetNaming().ModuleName, r.model.GetNaming().TableName, schema.ScenarioExport); err != nil {
-// 		r.Respond(res, req, ErrUnavailable)
-// 		return
-// 	}
-// 	if _, modelValues, err = r.model.Find(req.Context(), 0, 0, nil); err != nil {
-// 		r.Respond(res, req, ErrRecordNotFound)
-// 		return
-// 	}
-// 	for _, row := range modelValues {
-
-// 	}
-// }
-
 func NewResource[T any](model *Model[T], opts ...ResourceOption[T]) *Resource[T] {
 	r := &Resource[T]{
 		model: model,

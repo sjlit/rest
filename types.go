@@ -41,13 +41,6 @@ type (
 		ID string `json:"id"`
 	}
 
-	SearchResult struct {
-		Page       int   `json:"page"`
-		PageSize   int   `json:"page_size"`
-		TotalCount int64 `json:"total_count"`
-		Data       any   `json:"data"`
-	}
-
 	PageResult[T any] struct {
 		Page       int   `json:"page"`
 		PageSize   int   `json:"page_size"`
