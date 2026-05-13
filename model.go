@@ -275,6 +275,67 @@ func (m *Model[T]) Count(ctx context.Context, queryBuilder *query.Builder) (int6
 	return search.Count(childCtx)
 }
 
+func (m *Model[T]) Paginate(ctx context.Context, page, size int, queryBuilder *query.Builder) (*PageResult[T], error) {
+	if page < 1 {
+		page = 1
+	}
+	if size <= 0 {
+		size = 20
+	}
+
+	totalCount, err := m.Count(ctx, queryBuilder)
+	if err != nil {
+		return nil, err
+	}
+
+	offset := (page - 1) * size
+	data, err := m.List(ctx, offset, size, queryBuilder)
+	if err != nil {
+		return nil, err
+	}
+
+	totalPages := int((totalCount + int64(size) - 1) / int64(size))
+
+	return &PageResult[T]{
+		Page:       page,
+		PageSize:   size,
+		TotalCount: totalCount,
+		TotalPages: totalPages,
+		Data:       data,
+	}, nil
+}
+
+func (m *Model[T]) Cursor(ctx context.Context, cursor string, limit int, queryBuilder *query.Builder) (*CursorResult[T], error) {
+	offset, err := decodeCursor(cursor)
+	if err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+
+	data, err := m.List(ctx, offset, limit+1, queryBuilder)
+	if err != nil {
+		return nil, err
+	}
+
+	hasMore := len(data) > limit
+	if hasMore {
+		data = data[:limit]
+	}
+
+	nextCursor := ""
+	if hasMore {
+		nextCursor = encodeCursor(offset + limit)
+	}
+
+	return &CursorResult[T]{
+		Data:       data,
+		HasMore:    hasMore,
+		NextCursor: nextCursor,
+	}, nil
+}
+
 func (m *Model[T]) Find(ctx context.Context, offset, limit int, queryBuilder *query.Builder) (totalCount int64, values []*T, err error) {
 	if !m.HasScenario(schema.ScenarioSearch) {
 		return 0, nil, ErrPermissionDenied
