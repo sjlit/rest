@@ -47,4 +47,18 @@ type (
 		TotalCount int64 `json:"total_count"`
 		Data       any   `json:"data"`
 	}
+
+	PageResult[T any] struct {
+		Page       int   `json:"page"`
+		PageSize   int   `json:"page_size"`
+		TotalCount int64 `json:"total_count"`
+		TotalPages int   `json:"total_pages"`
+		Data       []*T  `json:"data"`
+	}
+
+	CursorResult[T any] struct {
+		Data       []*T   `json:"data"`
+		NextCursor string `json:"next_cursor,omitempty"`
+		HasMore    bool   `json:"has_more"`
+	}
 )

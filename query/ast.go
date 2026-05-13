@@ -100,3 +100,36 @@ type QuerySpec struct {
 	Limit   int
 	Offset  int
 }
+
+func (s QuerySpec) Clone() QuerySpec {
+	cloned := QuerySpec{
+		Source: s.Source,
+		Limit:  s.Limit,
+		Offset: s.Offset,
+	}
+	if len(s.Selects) > 0 {
+		cloned.Selects = make([]Expr, len(s.Selects))
+		copy(cloned.Selects, s.Selects)
+	}
+	if len(s.Joins) > 0 {
+		cloned.Joins = make([]Join, len(s.Joins))
+		copy(cloned.Joins, s.Joins)
+	}
+	if len(s.Where) > 0 {
+		cloned.Where = make([]Clause, len(s.Where))
+		copy(cloned.Where, s.Where)
+	}
+	if len(s.GroupBy) > 0 {
+		cloned.GroupBy = make([]string, len(s.GroupBy))
+		copy(cloned.GroupBy, s.GroupBy)
+	}
+	if len(s.Having) > 0 {
+		cloned.Having = make([]Clause, len(s.Having))
+		copy(cloned.Having, s.Having)
+	}
+	if len(s.OrderBy) > 0 {
+		cloned.OrderBy = make([]Order, len(s.OrderBy))
+		copy(cloned.OrderBy, s.OrderBy)
+	}
+	return cloned
+}

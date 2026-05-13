@@ -169,6 +169,10 @@ func (b *Builder) WhereNotExists(fn func(*Builder)) *Builder {
     return b
 }
 
+func (b *Builder) Clone() *Builder {
+	return &Builder{spec: b.spec.Clone()}
+}
+
 func escapeLikePattern(s string) string {
     s = strings.ReplaceAll(s, "\\", "\\\\")
     s = strings.ReplaceAll(s, "%", "\\%")
