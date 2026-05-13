@@ -11,18 +11,18 @@ var (
 )
 
 type Error struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Detail  any    `json:"detail"`
+	Code   int    `json:"code"`
+	Reason string `json:"reason"`
+	Detail any    `json:"detail,omitempty"`
 }
 
 func (e Error) Error() string {
-	return e.Message
+	return e.Reason
 }
 
 func NewError(code int, message string) Error {
 	return Error{
-		Code:    code,
-		Message: message,
+		Code:   code,
+		Reason: message,
 	}
 }

@@ -30,7 +30,6 @@ func decodeCursor(cursor string) (int, error) {
 }
 
 type Model[T any] struct {
-	ctx        context.Context
 	db         *gorm.DB
 	opts       *options
 	naming     Naming
@@ -97,21 +96,31 @@ func (m *Model[T]) Create(ctx context.Context, model *T) (diffAttrs []*DiffAttr,
 		TableName:  m.naming.TableName,
 		Scenario:   schema.ScenarioCreate,
 		Schemas:    schemas,
-		Context:    m.ctx,
+		Context:    m.GetDB().Statement.Context,
 	})
-	if err = m.GetDB().WithContext(childCtx).Transaction(func(tx *gorm.DB) error {
-		return tx.Create(model).Error
+	if err = m.GetDB().WithContext(childCtx).Transaction(func(tx *gorm.DB) (errTx error) {
+		if errTx = tx.Create(model).Error; errTx != nil {
+			return
+		}
+		diffAttrs = make([]*DiffAttr, 0, len(schemas))
+		for _, row := range schemas {
+			diffAttrs = append(diffAttrs, &DiffAttr{
+				Column:   row.Column,
+				Label:    row.Label,
+				Previous: nil,
+				Current:  m.GetFieldValue(reflect.ValueOf(model), row.Column),
+			})
+		}
+
+		return
 	}); err != nil {
 		return nil, err
 	}
-	diffAttrs = make([]*DiffAttr, 0, len(schemas))
-	for _, row := range schemas {
-		diffAttrs = append(diffAttrs, &DiffAttr{
-			Column:   row.Column,
-			Label:    row.Label,
-			Previous: nil,
-			Current:  m.GetFieldValue(reflect.ValueOf(model), row.Column),
-		})
+	if ac, ok := any(model).(AfterCreated); ok {
+		ac.AfterCreated(childCtx, m.GetDB(), diffAttrs)
+	}
+	if as, ok := any(model).(AfterSaved); ok {
+		as.AfterSaved(childCtx, m.GetDB(), diffAttrs)
 	}
 	return
 }
@@ -137,12 +146,11 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model T) (diffAtt
 		Scenario:        schema.ScenarioUpdate,
 		Schemas:         schemas,
 		PrimaryKeyValue: primaryKey,
-		Context:         m.ctx,
+		Context:         m.GetDB().Statement.Context,
 	})
-	err = m.GetDB().WithContext(childCtx).Transaction(func(tx *gorm.DB) error {
+	err = m.GetDB().WithContext(childCtx).Transaction(func(tx *gorm.DB) (errTx error) {
 		previousModel := reflect.New(reflect.Indirect(reflect.ValueOf(model)).Type()).Interface()
-		if errTx := tx.Where(map[string]any{m.primaryKey: primaryKey}).First(previousModel).Error; errTx != nil {
-			err = errTx
+		if errTx = tx.Where(map[string]any{m.primaryKey: primaryKey}).First(previousModel).Error; errTx != nil {
 			return errTx
 		}
 		previousModelValue := reflect.ValueOf(previousModel)
@@ -159,28 +167,34 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model T) (diffAtt
 			}
 		}
 		if len(updates) > 0 {
-			if errTx := tx.Model(model).
+			if errTx = tx.Model(model).
 				Where(map[string]any{m.primaryKey: primaryKey}).
 				Updates(updates).Error; errTx != nil {
 				return errTx
 			}
+			diffAttrs = make([]*DiffAttr, 0, len(schemas))
+			for _, row := range schemas {
+				v := m.GetFieldValue(modelValue, row.Column)
+				if previousValues[row.Column] != v {
+					diffAttrs = append(diffAttrs, &DiffAttr{
+						Column:   row.Column,
+						Label:    row.Label,
+						Previous: previousValues[row.Column],
+						Current:  v,
+					})
+				}
+			}
 		}
-		return nil
+		return
 	})
 	if err != nil {
 		return nil, err
 	}
-	diffAttrs = make([]*DiffAttr, 0, 10)
-	for _, row := range schemas {
-		v := m.GetFieldValue(modelValue, row.Column)
-		if previousValues[row.Column] != v {
-			diffAttrs = append(diffAttrs, &DiffAttr{
-				Column:   row.Column,
-				Label:    row.Label,
-				Previous: previousValues[row.Column],
-				Current:  v,
-			})
-		}
+	if au, ok := any(&model).(AfterUpdated); ok {
+		au.AfterUpdated(childCtx, m.GetDB(), diffAttrs)
+	}
+	if as, ok := any(&model).(AfterSaved); ok {
+		as.AfterSaved(childCtx, m.GetDB(), diffAttrs)
 	}
 	return
 }
@@ -194,18 +208,25 @@ func (m *Model[T]) Delete(ctx context.Context, primaryKeyValue any) (err error) 
 		TableName:       m.naming.TableName,
 		Scenario:        schema.ScenarioDelete,
 		PrimaryKeyValue: primaryKeyValue,
-		Context:         m.ctx,
+		Context:         m.GetDB().Statement.Context,
 	})
 	var model T
-	err = m.GetDB().WithContext(childCtx).Transaction(func(tx *gorm.DB) error {
-		errTx := tx.Model(model).Delete(map[string]any{
+	err = m.GetDB().WithContext(childCtx).Transaction(func(tx *gorm.DB) (errTx error) {
+		errTx = tx.Model(model).Delete(map[string]any{
 			m.primaryKey: primaryKeyValue,
 		}).Error
 		if errTx != nil {
 			return errTx
 		}
+
 		return nil
 	})
+	if err != nil {
+		return
+	}
+	if ad, ok := any(&model).(AfterDeleted); ok {
+		ad.AfterDeleted(childCtx, m.GetDB())
+	}
 	return
 }
 
@@ -241,7 +262,7 @@ func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *qu
 		TableName:  m.naming.TableName,
 		Scenario:   schema.ScenarioList,
 		Schemas:    schemas,
-		Context:    m.ctx,
+		Context:    m.GetDB().Statement.Context,
 	})
 
 	listBuilder := queryBuilder.Clone()
@@ -261,89 +282,64 @@ func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *qu
 }
 
 func (m *Model[T]) Count(ctx context.Context, queryBuilder *query.Builder) (int64, error) {
-	if !m.HasScenario(schema.ScenarioSearch) {
-		return 0, ErrPermissionDenied
-	}
 	var model T
 	childCtx := WithRuntimeScope(ctx, &RuntimeScope{
 		ModuleName: m.naming.ModuleName,
 		TableName:  m.naming.TableName,
 		Scenario:   schema.ScenarioList,
-		Context:    m.ctx,
+		Context:    m.GetDB().Statement.Context,
 	})
 	search := query.New(m.GetDB(), model, queryBuilder)
 	return search.Count(childCtx)
 }
 
-func (m *Model[T]) Paginate(ctx context.Context, page, size int, queryBuilder *query.Builder) (*PageResult[T], error) {
-	if page < 1 {
-		page = 1
+func (m *Model[T]) Paginate(ctx context.Context, page, size int, queryBuilder *query.Builder) (int64, []*T, error) {
+	if page < 0 {
+		page = 0
 	}
 	if size <= 0 {
 		size = 20
 	}
-
 	totalCount, err := m.Count(ctx, queryBuilder)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
-
-	offset := (page - 1) * size
+	offset := page * size
 	data, err := m.List(ctx, offset, size, queryBuilder)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
-
-	totalPages := int((totalCount + int64(size) - 1) / int64(size))
-
-	return &PageResult[T]{
-		Page:       page,
-		PageSize:   size,
-		TotalCount: totalCount,
-		TotalPages: totalPages,
-		Data:       data,
-	}, nil
+	return totalCount, data, nil
 }
 
-func (m *Model[T]) Cursor(ctx context.Context, cursor string, limit int, queryBuilder *query.Builder) (*CursorResult[T], error) {
+func (m *Model[T]) Cursor(ctx context.Context, cursor string, limit int, queryBuilder *query.Builder) (nextCursor string, hasMore bool, data []*T, err error) {
 	offset, err := decodeCursor(cursor)
 	if err != nil {
-		return nil, err
+		return
 	}
 	if limit <= 0 {
 		limit = 20
 	}
-
-	data, err := m.List(ctx, offset, limit+1, queryBuilder)
+	data, err = m.List(ctx, offset, limit+1, queryBuilder)
 	if err != nil {
-		return nil, err
+		return
 	}
-
-	hasMore := len(data) > limit
+	hasMore = len(data) > limit
 	if hasMore {
 		data = data[:limit]
 	}
-
-	nextCursor := ""
 	if hasMore {
 		nextCursor = encodeCursor(offset + limit)
 	}
-
-	return &CursorResult[T]{
-		Data:       data,
-		HasMore:    hasMore,
-		NextCursor: nextCursor,
-	}, nil
+	return
 }
 
-func NewModel[T any](ctx context.Context, opts ...Option) (v *Model[T], err error) {
+func NewModel[T any](opts ...Option) (v *Model[T], err error) {
 	v = &Model[T]{
 		opts: newOptions(opts...),
-		ctx:  ctx,
 	}
 	v.db = v.opts.db.Session(&gorm.Session{
-		NewDB:   true,
-		Context: ctx,
+		NewDB: true,
 	}).Debug()
 	var model T
 	if err = v.db.Statement.Parse(&model); err != nil {
@@ -358,7 +354,7 @@ func NewModel[T any](ctx context.Context, opts ...Option) (v *Model[T], err erro
 	if err = v.db.AutoMigrate(model); err != nil {
 		return
 	}
-	if v.naming.TableName, err = schema.AutoMigrate(ctx, v.GetDB(), model, v.opts.moduleName); err != nil {
+	if v.naming.TableName, err = schema.AutoMigrate(v.db.Statement.Context, v.GetDB(), model, v.opts.moduleName); err != nil {
 		return
 	}
 	singularizeTable := inflector.Singularize(v.naming.TableName)

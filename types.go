@@ -1,7 +1,10 @@
 package rest
 
 import (
+	"context"
 	"net/http"
+
+	"gorm.io/gorm"
 )
 
 type (
@@ -41,17 +44,32 @@ type (
 		ID string `json:"id"`
 	}
 
-	PageResult[T any] struct {
+	PageResult struct {
 		Page       int   `json:"page"`
 		PageSize   int   `json:"page_size"`
 		TotalCount int64 `json:"total_count"`
-		TotalPages int   `json:"total_pages"`
-		Data       []*T  `json:"data"`
+		Data       any   `json:"data"`
+	}
+)
+
+type (
+	// 新建之后的回调, 不在新建的事务内,是真正保存到数据库以后才执行的回调
+	AfterCreated interface {
+		AfterCreated(ctx context.Context, tx *gorm.DB, diff []*DiffAttr)
 	}
 
-	CursorResult[T any] struct {
-		Data       []*T   `json:"data"`
-		NextCursor string `json:"next_cursor,omitempty"`
-		HasMore    bool   `json:"has_more"`
+	// 更新之后的回调, 不在更新的事务内,是真正保存到数据库以后才执行的回调
+	AfterUpdated interface {
+		AfterUpdated(ctx context.Context, tx *gorm.DB, diff []*DiffAttr)
+	}
+
+	// 保存之后的回调, 不在保存的事务内,是真正保存到数据库以后才执行的回调
+	AfterDeleted interface {
+		AfterDeleted(ctx context.Context, tx *gorm.DB)
+	}
+
+	// 删除之后的回调, 不在删除的事务内,是真正保存到数据库以后才执行的回调
+	AfterSaved interface {
+		AfterSaved(ctx context.Context, tx *gorm.DB, diff []*DiffAttr)
 	}
 )

@@ -1,12 +1,15 @@
 package rest
 
 import (
+	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"path"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"git.nobla.cn/golang/rest/formats"
 	"git.nobla.cn/golang/rest/query"
@@ -68,7 +71,7 @@ func (r *Resource[T]) buildUri(scenario string) (method string, uri string) {
 		uri = path.Join(r.prefix, r.model.GetNaming().ModuleName, r.model.GetNaming().Singular, "detail", ":id")
 	case schema.ScenarioExport:
 		method = http.MethodGet
-		uri = path.Join(r.prefix, r.model.GetNaming().ModuleName, r.model.GetNaming().Singular, "export", ":id")
+		uri = path.Join(r.prefix, r.model.GetNaming().ModuleName, r.model.GetNaming().Singular, "export")
 	}
 	return
 }
@@ -134,6 +137,21 @@ func (r *Resource[T]) buildQuery(req *http.Request, schemas []schema.Schema) *qu
 			}
 		}
 	}
+	sortPar := req.FormValue("sort")
+	if sortPar != "" {
+		sorts := strings.SplitSeq(sortPar, ",")
+		for s := range sorts {
+			if s[0] == '-' {
+				builder.OrderBy(s[1:], "DESC")
+			} else {
+				if s[0] == '+' {
+					builder.OrderBy(s[1:], "ASC")
+				} else {
+					builder.OrderBy(s, "ASC")
+				}
+			}
+		}
+	}
 	return builder
 }
 
@@ -175,10 +193,10 @@ func (r *Resource[T]) Register() {
 		method, uri = r.buildUri(schema.ScenarioSearch)
 		r.router.Handle(method, uri, r.Search)
 	}
-	// if r.model.HasScenario(schema.ScenarioExport) {
-	// 	method, uri = r.buildUri(schema.ScenarioExport)
-	// 	r.router.Handle(method, uri, r.Export)
-	// }
+	if r.model.HasScenario(schema.ScenarioExport) {
+		method, uri = r.buildUri(schema.ScenarioExport)
+		r.router.Handle(method, uri, r.Export)
+	}
 }
 
 func (r *Resource[T]) Respond(res http.ResponseWriter, req *http.Request, data any) {
@@ -263,11 +281,12 @@ func (r *Resource[T]) Detail(res http.ResponseWriter, req *http.Request) {
 
 func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
 	var (
-		err        error
-		pageIndex  int
-		pageSize   int
-		schemas    []schema.Schema
-		result     *PageResult[T]
+		err         error
+		pageIndex   int
+		pageSize    int
+		schemas     []schema.Schema
+		modelValues []*T
+		totalCount  int64
 	)
 	pageIndex, _ = strconv.Atoi(req.URL.Query().Get("page"))
 	pageSize, _ = strconv.Atoi(req.URL.Query().Get("page_size"))
@@ -285,14 +304,69 @@ func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	queryBuilder := r.buildQuery(req, schemas)
-	if result, err = r.model.Paginate(req.Context(), pageIndex+1, pageSize, queryBuilder); err != nil {
+	if totalCount, modelValues, err = r.model.Paginate(req.Context(), pageIndex, pageSize, queryBuilder); err != nil {
 		r.Respond(res, req, ErrUnavailable)
 		return
 	}
+	result := &PageResult{
+		Page:       pageIndex,
+		PageSize:   pageSize,
+		TotalCount: totalCount,
+	}
 	if r.formatter != nil {
-		result.Data = r.formatter.FormatModels(req.Context(), result.Data, schemas, r.model.GetDB().Statement, "").([]*T)
+		result.Data = r.formatter.FormatModels(req.Context(), modelValues, schemas, r.model.GetDB().Statement, "")
+	} else {
+		result.Data = modelValues
 	}
 	r.Respond(res, req, result)
+}
+
+func (r *Resource[T]) Export(res http.ResponseWriter, req *http.Request) {
+	var (
+		err         error
+		modelValues []*T
+		schemas     []schema.Schema
+	)
+	if schemas, err = schema.GetVisibleSchemas(req.Context(), r.model.GetDB(), r.model.GetNaming().ModuleName, r.model.GetNaming().TableName, schema.ScenarioExport); err != nil {
+		r.Respond(res, req, ErrUnavailable)
+		return
+	}
+	queryBuilder := r.buildQuery(req, schemas)
+	if modelValues, err = r.model.List(req.Context(), 0, 1000, queryBuilder); err != nil {
+		r.Respond(res, req, ErrUnavailable)
+		return
+	}
+	res.Header().Set("Content-Type", "text/csv")
+	res.Header().Set("Access-Control-Expose-Headers", "Content-Disposition")
+	res.Header().Set("Content-Disposition", fmt.Sprintf(
+		"attachment;filename=%s_%s.csv",
+		r.model.GetNaming().Singular,
+		time.Now().Format(time.DateTime),
+	))
+	value := r.formatter.FormatModels(req.Context(), modelValues, schemas, r.model.GetDB().Statement, "")
+	writer := csv.NewWriter(res)
+	rows := make([]string, len(schemas))
+	for i, field := range schemas {
+		rows[i] = field.Label
+	}
+	_ = writer.Write(rows)
+	if values, ok := value.([]any); ok {
+		for _, val := range values {
+			row, ok2 := val.(map[string]any)
+			if !ok2 {
+				continue
+			}
+			for i, field := range schemas {
+				if v, ok := row[field.Column]; ok {
+					rows[i] = fmt.Sprint(v)
+				} else {
+					rows[i] = ""
+				}
+			}
+			_ = writer.Write(rows)
+		}
+	}
+	writer.Flush()
 }
 
 func NewResource[T any](model *Model[T], opts ...ResourceOption[T]) *Resource[T] {
