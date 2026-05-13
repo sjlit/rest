@@ -196,6 +196,12 @@ func (m *Model[T]) Create(ctx context.Context, model *T) (diffAttrs []*DiffAttr,
 		runtimeScope.Schemas = schemas
 	}
 	if err = m.GetDB().WithContext(ctx).Transaction(func(tx *gorm.DB) (errTx error) {
+		// BeforeCreate hooks
+		if errTx = m.runBeforeHooks(ctx, tx, model,
+			m.globalHooks.beforeCreate, m.localHooks.beforeCreate); errTx != nil {
+			return
+		}
+
 		if errTx = tx.Create(model).Error; errTx != nil {
 			return
 		}
@@ -213,6 +219,16 @@ func (m *Model[T]) Create(ctx context.Context, model *T) (diffAttrs []*DiffAttr,
 	}); err != nil {
 		return nil, err
 	}
+
+	// AfterCreate hooks
+	m.runAfterHooks(ctx, m.GetDB(), model, diffAttrs,
+		m.globalHooks.afterCreate, m.localHooks.afterCreate)
+
+	// AfterSaved hooks
+	m.runAfterHooks(ctx, m.GetDB(), model, diffAttrs,
+		m.globalHooks.afterSaved, m.localHooks.afterSaved)
+
+	// 兼容现有接口式 hook
 	if ac, ok := any(model).(AfterCreated); ok {
 		ac.AfterCreated(ctx, m.GetDB(), diffAttrs)
 	}
