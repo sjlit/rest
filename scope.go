@@ -2,7 +2,6 @@ package rest
 
 import (
 	"context"
-	"net/http"
 
 	"git.nobla.cn/golang/rest/schema"
 )
@@ -12,12 +11,12 @@ type scopeKey struct{}
 var runtimeScopeKey = &scopeKey{}
 
 type RuntimeScope struct {
-	User            string
-	ModuleName      string
-	TableName       string
-	Scenario        string
+	User            string //用户ID
+	ModuleName      string //模块名称
+	TableName       string //表名称
+	Scenario        string //场景
+	TenantID        string //租户
 	Schemas         []schema.Schema
-	Request         *http.Request
 	PrimaryKeyValue any
 	Context         context.Context
 }

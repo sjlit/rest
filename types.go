@@ -7,6 +7,13 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	QueryParamPage     = "page"
+	QueryParamPageSize = "page_size"
+	QueryParamSort     = "sort"
+	QueryParamFormat   = "__format"
+)
+
 type (
 	Naming struct {
 		Pluralize  string
@@ -50,6 +57,28 @@ type (
 		TotalCount int64 `json:"total_count"`
 		Data       any   `json:"data"`
 	}
+)
+
+type (
+	BaseModel struct {
+		ID        uint           `json:"id" gorm:"primarykey"`
+		CreatedAt int64          `json:"created_at" gorm:"autoCreateTime"`
+		UpdatedAt int64          `json:"updated_at" gorm:"autoUpdateTime"`
+		DeletedAt gorm.DeletedAt `gorm:"index"`
+	}
+
+	TenantModel struct {
+		BaseModel
+		TenantID string `gorm:"column:tenant_id;type:char(60);index"`
+	}
+)
+
+type (
+	// ResolveTenantFunc 获取租户信息
+	ResolveTenantFunc func(ctx context.Context, r *http.Request) string
+
+	// ResolveUserFunc 获取用户信息
+	ResolveUserFunc func(ctx context.Context, r *http.Request) string
 )
 
 type (

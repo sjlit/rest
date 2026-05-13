@@ -91,14 +91,11 @@ func (m *Model[T]) Create(ctx context.Context, model *T) (diffAttrs []*DiffAttr,
 	if schemas, err = schema.GetVisibleSchemas(ctx, m.GetDB(), m.naming.ModuleName, m.naming.TableName, schema.ScenarioCreate); err != nil {
 		return
 	}
-	childCtx := WithRuntimeScope(ctx, &RuntimeScope{
-		ModuleName: m.naming.ModuleName,
-		TableName:  m.naming.TableName,
-		Scenario:   schema.ScenarioCreate,
-		Schemas:    schemas,
-		Context:    m.GetDB().Statement.Context,
-	})
-	if err = m.GetDB().WithContext(childCtx).Transaction(func(tx *gorm.DB) (errTx error) {
+	runtimeScope := RuntimeScopeFromContext(ctx)
+	if runtimeScope != nil {
+		runtimeScope.Schemas = schemas
+	}
+	if err = m.GetDB().WithContext(ctx).Transaction(func(tx *gorm.DB) (errTx error) {
 		if errTx = tx.Create(model).Error; errTx != nil {
 			return
 		}
@@ -117,10 +114,10 @@ func (m *Model[T]) Create(ctx context.Context, model *T) (diffAttrs []*DiffAttr,
 		return nil, err
 	}
 	if ac, ok := any(model).(AfterCreated); ok {
-		ac.AfterCreated(childCtx, m.GetDB(), diffAttrs)
+		ac.AfterCreated(ctx, m.GetDB(), diffAttrs)
 	}
 	if as, ok := any(model).(AfterSaved); ok {
-		as.AfterSaved(childCtx, m.GetDB(), diffAttrs)
+		as.AfterSaved(ctx, m.GetDB(), diffAttrs)
 	}
 	return
 }
@@ -140,15 +137,11 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model T) (diffAtt
 	modelValue := reflect.ValueOf(model)
 	updates = make(map[string]any)
 	previousValues = make(map[string]any)
-	childCtx := WithRuntimeScope(ctx, &RuntimeScope{
-		ModuleName:      m.naming.ModuleName,
-		TableName:       m.naming.TableName,
-		Scenario:        schema.ScenarioUpdate,
-		Schemas:         schemas,
-		PrimaryKeyValue: primaryKey,
-		Context:         m.GetDB().Statement.Context,
-	})
-	err = m.GetDB().WithContext(childCtx).Transaction(func(tx *gorm.DB) (errTx error) {
+	runtimeScope := RuntimeScopeFromContext(ctx)
+	if runtimeScope != nil {
+		runtimeScope.Schemas = schemas
+	}
+	err = m.GetDB().WithContext(ctx).Transaction(func(tx *gorm.DB) (errTx error) {
 		previousModel := reflect.New(reflect.Indirect(reflect.ValueOf(model)).Type()).Interface()
 		if errTx = tx.Where(map[string]any{m.primaryKey: primaryKey}).First(previousModel).Error; errTx != nil {
 			return errTx
@@ -191,10 +184,10 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model T) (diffAtt
 		return nil, err
 	}
 	if au, ok := any(&model).(AfterUpdated); ok {
-		au.AfterUpdated(childCtx, m.GetDB(), diffAttrs)
+		au.AfterUpdated(ctx, m.GetDB(), diffAttrs)
 	}
 	if as, ok := any(&model).(AfterSaved); ok {
-		as.AfterSaved(childCtx, m.GetDB(), diffAttrs)
+		as.AfterSaved(ctx, m.GetDB(), diffAttrs)
 	}
 	return
 }
@@ -203,15 +196,8 @@ func (m *Model[T]) Delete(ctx context.Context, primaryKeyValue any) (err error) 
 	if !m.HasScenario(schema.ScenarioDelete) {
 		return ErrPermissionDenied
 	}
-	childCtx := WithRuntimeScope(ctx, &RuntimeScope{
-		ModuleName:      m.naming.ModuleName,
-		TableName:       m.naming.TableName,
-		Scenario:        schema.ScenarioDelete,
-		PrimaryKeyValue: primaryKeyValue,
-		Context:         m.GetDB().Statement.Context,
-	})
 	var model T
-	err = m.GetDB().WithContext(childCtx).Transaction(func(tx *gorm.DB) (errTx error) {
+	err = m.GetDB().WithContext(ctx).Transaction(func(tx *gorm.DB) (errTx error) {
 		errTx = tx.Model(model).Delete(map[string]any{
 			m.primaryKey: primaryKeyValue,
 		}).Error
@@ -225,7 +211,7 @@ func (m *Model[T]) Delete(ctx context.Context, primaryKeyValue any) (err error) 
 		return
 	}
 	if ad, ok := any(&model).(AfterDeleted); ok {
-		ad.AfterDeleted(childCtx, m.GetDB())
+		ad.AfterDeleted(ctx, m.GetDB())
 	}
 	return
 }
@@ -250,21 +236,9 @@ func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *qu
 		return nil, ErrPermissionDenied
 	}
 	var (
-		model   T
-		schemas []schema.Schema
-		err     error
+		model T
+		err   error
 	)
-	if schemas, err = schema.GetVisibleSchemas(ctx, m.GetDB(), m.naming.ModuleName, m.naming.TableName, schema.ScenarioList); err != nil {
-		return nil, err
-	}
-	childCtx := WithRuntimeScope(ctx, &RuntimeScope{
-		ModuleName: m.naming.ModuleName,
-		TableName:  m.naming.TableName,
-		Scenario:   schema.ScenarioList,
-		Schemas:    schemas,
-		Context:    m.GetDB().Statement.Context,
-	})
-
 	listBuilder := queryBuilder.Clone()
 	if offset >= 0 {
 		listBuilder.Offset(offset)
@@ -272,10 +246,9 @@ func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *qu
 	if limit > 0 {
 		listBuilder.Limit(limit)
 	}
-
 	search := query.New(m.GetDB(), model, listBuilder)
 	values := make([]*T, 0)
-	if err = search.All(childCtx, &values); err != nil {
+	if err = search.All(ctx, &values); err != nil {
 		return nil, err
 	}
 	return values, nil
@@ -283,14 +256,8 @@ func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *qu
 
 func (m *Model[T]) Count(ctx context.Context, queryBuilder *query.Builder) (int64, error) {
 	var model T
-	childCtx := WithRuntimeScope(ctx, &RuntimeScope{
-		ModuleName: m.naming.ModuleName,
-		TableName:  m.naming.TableName,
-		Scenario:   schema.ScenarioList,
-		Context:    m.GetDB().Statement.Context,
-	})
 	search := query.New(m.GetDB(), model, queryBuilder)
-	return search.Count(childCtx)
+	return search.Count(ctx)
 }
 
 func (m *Model[T]) Paginate(ctx context.Context, page, size int, queryBuilder *query.Builder) (int64, []*T, error) {
