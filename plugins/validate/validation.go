@@ -49,7 +49,7 @@ func (validate *Validate) uniqueValidate(ctx context.Context, fl validator.Field
 	}
 	sess := scope.DB.Session(&gorm.Session{NewDB: true})
 	if primaryKeyValue.IsValid() && !primaryKeyValue.IsZero() && field != nil {
-		sess.Model(scope.Model).Where(scope.Column+"=? AND "+field.Name+" != ?", val, primaryKeyValue.Interface()).Count(&count)
+		sess.Model(scope.Model).Where(scope.Column+"=? AND "+field.DBName+" != ?", val, primaryKeyValue.Interface()).Count(&count)
 	} else {
 		sess.Model(scope.Model).Where(scope.Column+"=?", val).Count(&count)
 	}
@@ -114,7 +114,7 @@ func (validate *Validate) Initialize(db *gorm.DB) (err error) {
 	if err = db.Callback().Create().Before("gorm:before_create").Register("rest_validate_create", validate.Validate); err != nil {
 		return
 	}
-	if err = db.Callback().Create().Before("gorm:before_update").Register("rest_validate_update", validate.Validate); err != nil {
+	if err = db.Callback().Update().Before("gorm:before_update").Register("rest_validate_update", validate.Validate); err != nil {
 		return
 	}
 	if err = validate.validator.RegisterValidationCtx("telephone", validate.telephoneValidate); err != nil {

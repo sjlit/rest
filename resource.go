@@ -398,6 +398,10 @@ func (r *Resource[T]) Export(res http.ResponseWriter, req *http.Request) {
 		r.Respond(res, req, ErrUnavailable)
 		return
 	}
+	if r.formatter == nil {
+		r.Respond(res, req, ErrUnavailable)
+		return
+	}
 	res.Header().Set("Content-Type", "text/csv")
 	res.Header().Set("Access-Control-Expose-Headers", "Content-Disposition")
 	res.Header().Set("Content-Disposition", fmt.Sprintf(

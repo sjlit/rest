@@ -152,9 +152,6 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model T) (diffAtt
 		}
 		for _, row := range schemas {
 			v := m.GetFieldValue(modelValue, row.Column)
-			if IsEmpty(v) {
-				continue
-			}
 			if previousValues[row.Column] != v {
 				updates[row.Column] = v
 			}

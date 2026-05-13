@@ -72,9 +72,9 @@ func formatError(rule schema.Rule, scm schema.Schema, tag string) string {
 		}
 	case "min":
 		if scm.Type == "string" {
-			s = scm.Label + "长度不能小于" + strconv.Itoa(rule.Max)
+			s = scm.Label + "长度不能小于" + strconv.Itoa(rule.Min)
 		} else {
-			s = scm.Label + "值不能小于" + strconv.Itoa(rule.Max)
+			s = scm.Label + "值不能小于" + strconv.Itoa(rule.Min)
 		}
 	}
 	return s
