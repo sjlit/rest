@@ -103,8 +103,6 @@ type Order struct {
 	Direction string
 }
 
-// ---- Query ----
-
 type Query struct {
 	db      *gorm.DB
 	model   any

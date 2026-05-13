@@ -65,7 +65,7 @@ func (m *Model[T]) GetFieldValue(refValue reflect.Value, column string) any {
 	return targetValue.Interface()
 }
 
-func (m *Model[T]) Create(ctx context.Context, model T) (diffAttrs []*DiffAttr, err error) {
+func (m *Model[T]) Create(ctx context.Context, model *T) (diffAttrs []*DiffAttr, err error) {
 	if !m.HasScenario(schema.ScenarioCreate) {
 		return nil, ErrPermissionDenied
 	}
@@ -134,6 +134,9 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model T) (diffAtt
 		}
 		for _, row := range schemas {
 			v := m.GetFieldValue(modelValue, row.Column)
+			if IsEmpty(v) {
+				continue
+			}
 			if previousValues[row.Column] != v {
 				updates[row.Column] = v
 			}
@@ -204,7 +207,7 @@ func (m *Model[T]) Detail(ctx context.Context, primaryKey any) (model *T, err er
 	return &modelValue, nil
 }
 
-func (m *Model[T]) Search(ctx context.Context, offset, limit int, queryBuilder *query.Builder) (totalCount int64, values []*T, err error) {
+func (m *Model[T]) Find(ctx context.Context, offset, limit int, queryBuilder *query.Builder) (totalCount int64, values []*T, err error) {
 	if !m.HasScenario(schema.ScenarioSearch) {
 		return 0, nil, ErrPermissionDenied
 	}
@@ -212,7 +215,7 @@ func (m *Model[T]) Search(ctx context.Context, offset, limit int, queryBuilder *
 		model   T
 		schemas []schema.Schema
 	)
-	if schemas, err = schema.GetVisibleSchemas(ctx, m.GetDB(), m.naming.ModuleName, m.naming.TableName, schema.ScenarioSearch); err != nil {
+	if schemas, err = schema.GetVisibleSchemas(ctx, m.GetDB(), m.naming.ModuleName, m.naming.TableName, schema.ScenarioList); err != nil {
 		return
 	}
 	childCtx := WithRuntimeScope(ctx, &RuntimeScope{
