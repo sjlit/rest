@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"path"
 	"reflect"
@@ -235,7 +236,7 @@ func (r *Resource[T]) Register() {
 		r.router.Handle(method, uri, r.Export)
 	}
 	if r.model.OpenAPIEnabled() {
-		if spec, err := openapi.NewGenerator().Generate(
+		spec, err := openapi.NewGenerator().Generate(
 			context.Background(),
 			r.model.GetDB(),
 			openapi.Config{
@@ -257,8 +258,14 @@ func (r *Resource[T]) Register() {
 				},
 				BuildUri: r.buildUri,
 			},
-		); err == nil {
-			if bytes, err := json.Marshal(spec); err == nil {
+		)
+		if err != nil {
+			log.Printf("[OpenAPI] failed to generate spec for %s: %v", r.model.GetNaming().ModuleName, err)
+		} else {
+			bytes, err := json.Marshal(spec)
+			if err != nil {
+				log.Printf("[OpenAPI] failed to marshal spec for %s: %v", r.model.GetNaming().ModuleName, err)
+			} else {
 				r.openAPISpec = bytes
 				openAPIPath := path.Join(r.prefix, r.model.GetNaming().ModuleName, r.model.GetNaming().Singular, "openapi.json")
 				r.router.Handle(http.MethodGet, openAPIPath, r.ServeOpenAPI)
