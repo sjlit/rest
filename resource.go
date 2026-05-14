@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"git.nobla.cn/golang/rest/formats"
+	"git.nobla.cn/golang/rest/openapi"
 	"git.nobla.cn/golang/rest/query"
 	"git.nobla.cn/golang/rest/schema"
 )
@@ -28,6 +30,7 @@ type (
 		formatter     *formats.Formatter
 		tenantResolve ResolveTenantFunc
 		userResolve   ResolveUserFunc
+		openAPISpec   []byte
 	}
 )
 
@@ -231,6 +234,37 @@ func (r *Resource[T]) Register() {
 		method, uri = r.buildUri(schema.ScenarioExport)
 		r.router.Handle(method, uri, r.Export)
 	}
+	if r.model.OpenAPIEnabled() {
+		if spec, err := openapi.NewGenerator().Generate(
+			context.Background(),
+			r.model.GetDB(),
+			openapi.Config{
+				Title:      r.model.GetNaming().ModuleName + " API",
+				Version:    "1.0.0",
+				ModuleName: r.model.GetNaming().ModuleName,
+				TableName:  r.model.GetNaming().TableName,
+				Singular:   r.model.GetNaming().Singular,
+				Plural:     r.model.GetNaming().Pluralize,
+				Prefix:     r.prefix,
+				PrimaryKey: r.model.GetPrimaryKey(),
+				Scenarios: []string{
+					schema.ScenarioCreate,
+					schema.ScenarioUpdate,
+					schema.ScenarioDelete,
+					schema.ScenarioDetail,
+					schema.ScenarioSearch,
+					schema.ScenarioExport,
+				},
+				BuildUri: r.buildUri,
+			},
+		); err == nil {
+			if bytes, err := json.Marshal(spec); err == nil {
+				r.openAPISpec = bytes
+				openAPIPath := path.Join(r.prefix, r.model.GetNaming().ModuleName, r.model.GetNaming().Singular, "openapi.json")
+				r.router.Handle(http.MethodGet, openAPIPath, r.ServeOpenAPI)
+			}
+		}
+	}
 }
 
 func (r *Resource[T]) Respond(res http.ResponseWriter, req *http.Request, data any) {
@@ -245,6 +279,15 @@ func (r *Resource[T]) Respond(res http.ResponseWriter, req *http.Request, data a
 		return
 	}
 	json.NewEncoder(res).Encode(data)
+}
+
+func (r *Resource[T]) ServeOpenAPI(res http.ResponseWriter, req *http.Request) {
+	if len(r.openAPISpec) == 0 {
+		res.WriteHeader(http.StatusNotFound)
+		return
+	}
+	res.Header().Set("Content-Type", "application/json")
+	res.Write(r.openAPISpec)
 }
 
 func (r *Resource[T]) Create(res http.ResponseWriter, req *http.Request) {
