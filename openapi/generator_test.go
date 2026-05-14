@@ -3,6 +3,7 @@ package openapi
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"git.nobla.cn/golang/rest/schema"
@@ -138,6 +139,9 @@ type TestUser struct {
 func TestGenerate(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	if err != nil {
+		if strings.Contains(err.Error(), "cgo") || strings.Contains(err.Error(), "stub") {
+			t.Skip("sqlite requires cgo")
+		}
 		t.Fatalf("open db: %v", err)
 	}
 	if err := db.AutoMigrate(&schema.Schema{}, &TestUser{}, &TestOrder{}); err != nil {
