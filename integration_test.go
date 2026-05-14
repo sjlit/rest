@@ -2,8 +2,13 @@ package rest
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"git.nobla.cn/golang/rest/openapi"
 	"git.nobla.cn/golang/rest/schema"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -117,5 +122,67 @@ func TestIntegrationPreloadList(t *testing.T) {
 	}
 	if !foundBob {
 		t.Error("bob not found in list")
+	}
+}
+
+type testRouter struct {
+	mux *http.ServeMux
+}
+
+func (tr *testRouter) Handle(method, path string, handler http.HandlerFunc) {
+	tr.mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != method {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		handler(w, r)
+	})
+}
+
+func TestIntegrationOpenAPIEndpoint(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		if strings.Contains(err.Error(), "cgo") || strings.Contains(err.Error(), "stub") {
+			t.Skip("sqlite requires cgo")
+		}
+		t.Fatalf("failed to open db: %v", err)
+	}
+	if err := db.AutoMigrate(&schema.Schema{}, &IntegUser{}, &IntegOrder{}); err != nil {
+		t.Fatalf("failed to migrate: %v", err)
+	}
+
+	userModel, err := NewModel[IntegUser](WithDB(db), WithModuleName("integration"), WithOpenAPI(true))
+	if err != nil {
+		t.Fatalf("NewModel failed: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	userResource := NewResource(userModel,
+		WithRouter[IntegUser](&testRouter{mux: mux}),
+		WithPrefix[IntegUser]("/api/v1"),
+	)
+	userResource.Register()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/integration/user/openapi.json", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	var spec openapi.Spec
+	if err := json.Unmarshal(rec.Body.Bytes(), &spec); err != nil {
+		t.Fatalf("unmarshal spec: %v", err)
+	}
+
+	if spec.OpenAPI != "3.0.3" {
+		t.Errorf("openapi version: want 3.0.3, got %s", spec.OpenAPI)
+	}
+	if len(spec.Paths) == 0 {
+		t.Error("expected non-empty paths")
+	}
+	if len(spec.Components.Schemas) == 0 {
+		t.Error("expected non-empty schemas")
 	}
 }
