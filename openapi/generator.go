@@ -236,7 +236,6 @@ func (s *genState) buildRequestBody(refName, module, table, scenario string) *Re
 }
 
 func (s *genState) buildSchemaRef(module, table, scenario string) *SchemaRef {
-	key := module + ":" + table
 	name := schemaName(module, table)
 
 	// For the primary model, use scenario-specific naming for Create/Update
@@ -251,10 +250,10 @@ func (s *genState) buildSchemaRef(module, table, scenario string) *SchemaRef {
 		}
 	}
 
-	if s.visited[key] {
+	if s.visited[name] {
 		return &SchemaRef{Ref: "#/components/schemas/" + name}
 	}
-	s.visited[key] = true
+	s.visited[name] = true
 
 	schemas, err := schema.GetVisibleSchemas(s.ctx, s.db, module, table, scenario)
 	if err != nil || len(schemas) == 0 {
@@ -277,10 +276,10 @@ func (s *genState) buildSchemaRef(module, table, scenario string) *SchemaRef {
 
 func (s *genState) schemaToProperty(sc schema.Schema, scenario string) *SchemaRef {
 	if sc.Relations.Type != "" {
-		assocRef := s.buildSchemaRef(sc.Relations.Module, sc.Relations.Table, scenario)
+		assocRef := s.buildSchemaRef(sc.Relations.Module, sc.Relations.Table, schema.ScenarioDetail)
 		switch sc.Relations.Type {
 		case "has_many", "many_to_many":
-			// Return empty array for nil associations
+			// Represent association as array of referenced schema
 			return &SchemaRef{Type: "array", Items: assocRef}
 		default:
 			return assocRef
