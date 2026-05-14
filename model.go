@@ -83,6 +83,28 @@ func (m *Model[T]) GetFieldValue(refValue reflect.Value, column string) any {
 	return targetValue.Interface()
 }
 
+func (m *Model[T]) SetFieldValue(stmt *gorm.Statement, refValue reflect.Value, column string, value any) {
+	var (
+		rawField *gormSchema.Field
+	)
+	refVal := reflect.Indirect(refValue)
+	for _, field := range stmt.Schema.Fields {
+		if field.DBName == column || field.Name == column {
+			rawField = field
+			break
+		}
+	}
+	if rawField == nil {
+		return
+	}
+	var targetValue reflect.Value
+	targetValue = refVal
+	for _, i := range rawField.StructField.Index {
+		targetValue = targetValue.Field(i)
+	}
+	targetValue.Set(reflect.ValueOf(value))
+}
+
 func (m *Model[T]) RegisterBeforeCreate(fn BeforeCreateHook[T]) {
 	m.initLocalHooks()
 	m.localHooks.beforeCreate = append(m.localHooks.beforeCreate, wrapBeforeHook(fn))
@@ -194,6 +216,14 @@ func (m *Model[T]) Create(ctx context.Context, model *T) (diffAttrs []*DiffAttr,
 	runtimeScope := RuntimeScopeFromContext(ctx)
 	if runtimeScope != nil {
 		runtimeScope.Schemas = schemas
+	} else {
+		runtimeScope = &RuntimeScope{
+			Schemas:    schemas,
+			ModuleName: m.GetNaming().ModuleName,
+			TableName:  m.GetNaming().TableName,
+			Scenario:   schema.ScenarioCreate,
+		}
+		ctx = WithRuntimeScope(ctx, runtimeScope)
 	}
 	if err = m.GetDB().WithContext(ctx).Transaction(func(tx *gorm.DB) (errTx error) {
 		// BeforeCreate hooks
@@ -206,12 +236,13 @@ func (m *Model[T]) Create(ctx context.Context, model *T) (diffAttrs []*DiffAttr,
 			return
 		}
 		diffAttrs = make([]*DiffAttr, 0, len(schemas))
+		modelRef := reflect.ValueOf(model)
 		for _, row := range schemas {
 			diffAttrs = append(diffAttrs, &DiffAttr{
 				Column:   row.Column,
 				Label:    row.Label,
 				Previous: nil,
-				Current:  m.GetFieldValue(reflect.ValueOf(model), row.Column),
+				Current:  m.GetFieldValue(modelRef, row.Column),
 			})
 		}
 
@@ -238,7 +269,7 @@ func (m *Model[T]) Create(ctx context.Context, model *T) (diffAttrs []*DiffAttr,
 	return
 }
 
-func (m *Model[T]) Update(ctx context.Context, primaryKey any, model T) (diffAttrs []*DiffAttr, err error) {
+func (m *Model[T]) Update(ctx context.Context, primaryKey any, model *T, columns ...string) (primaryKeyValue any, err error) {
 	if !m.HasScenario(schema.ScenarioUpdate) {
 		return nil, ErrPermissionDenied
 	}
@@ -246,45 +277,59 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model T) (diffAtt
 		updates        map[string]any
 		previousValues map[string]any
 		schemas        []schema.Schema
+		diffAttrs      []*DiffAttr
 	)
 	if schemas, err = schema.GetVisibleSchemas(ctx, m.GetDB(), m.naming.ModuleName, m.naming.TableName, schema.ScenarioUpdate); err != nil {
-		return
+		return nil, err
 	}
-	modelValue := reflect.ValueOf(model)
+	modelRef := reflect.ValueOf(model)
 	updates = make(map[string]any)
 	previousValues = make(map[string]any)
 	runtimeScope := RuntimeScopeFromContext(ctx)
 	if runtimeScope != nil {
 		runtimeScope.Schemas = schemas
+	} else {
+		runtimeScope = &RuntimeScope{
+			Schemas:    schemas,
+			ModuleName: m.GetNaming().ModuleName,
+			TableName:  m.GetNaming().TableName,
+			Scenario:   schema.ScenarioUpdate,
+		}
+		ctx = WithRuntimeScope(ctx, runtimeScope)
 	}
 	err = m.GetDB().WithContext(ctx).Transaction(func(tx *gorm.DB) (errTx error) {
-		previousModel := reflect.New(reflect.Indirect(reflect.ValueOf(model)).Type()).Interface()
+		previousModel := new(T)
 		if errTx = tx.Where(map[string]any{m.primaryKey: primaryKey}).First(previousModel).Error; errTx != nil {
 			return errTx
 		}
-		previousModelValue := reflect.ValueOf(previousModel)
+		previousModelRef := reflect.ValueOf(previousModel)
+		primaryKeyValue = m.GetFieldValue(previousModelRef, m.primaryKey)
 		for _, row := range schemas {
-			previousValues[row.Column] = m.GetFieldValue(previousModelValue, row.Column)
+			previousValues[row.Column] = m.GetFieldValue(previousModelRef, row.Column)
 		}
 		for _, row := range schemas {
-			v := m.GetFieldValue(modelValue, row.Column)
-			if previousValues[row.Column] != v {
-				updates[row.Column] = v
+			if (len(columns) == 0 || slices.Contains(columns, row.Column)) && row.PrimaryKey == 0 {
+				v := m.GetFieldValue(modelRef, row.Column)
+				if previousValues[row.Column] != v {
+					updates[row.Column] = v
+				}
 			}
 		}
 		if len(updates) > 0 {
-			if errTx = m.runBeforeHooks(ctx, tx, &model,
-				m.globalHooks.beforeUpdate, m.localHooks.beforeUpdate); errTx != nil {
+			if errTx = m.runBeforeHooks(ctx, tx, model, m.globalHooks.beforeUpdate, m.localHooks.beforeUpdate); errTx != nil {
 				return errTx
 			}
-			if errTx = tx.Model(model).
+			if errTx = tx.Model(previousModel).
 				Where(map[string]any{m.primaryKey: primaryKey}).
 				Updates(updates).Error; errTx != nil {
 				return errTx
 			}
+			if errTx = tx.Model(model).Where(map[string]any{m.primaryKey: primaryKey}).First(model).Error; errTx != nil {
+				return errTx
+			}
 			diffAttrs = make([]*DiffAttr, 0, len(schemas))
 			for _, row := range schemas {
-				v := m.GetFieldValue(modelValue, row.Column)
+				v := m.GetFieldValue(modelRef, row.Column)
 				if previousValues[row.Column] != v {
 					diffAttrs = append(diffAttrs, &DiffAttr{
 						Column:   row.Column,
@@ -300,37 +345,47 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model T) (diffAtt
 	if err != nil {
 		return nil, err
 	}
-	m.runAfterHooks(ctx, m.GetDB(), &model, diffAttrs,
+	m.runAfterHooks(ctx, m.GetDB(), model, diffAttrs,
 		m.globalHooks.afterUpdate, m.localHooks.afterUpdate)
-	m.runAfterHooks(ctx, m.GetDB(), &model, diffAttrs,
+	m.runAfterHooks(ctx, m.GetDB(), model, diffAttrs,
 		m.globalHooks.afterSaved, m.localHooks.afterSaved)
-	if au, ok := any(&model).(AfterUpdated); ok {
+	if au, ok := any(model).(AfterUpdated); ok {
 		au.AfterUpdated(ctx, m.GetDB(), diffAttrs)
 	}
-	if as, ok := any(&model).(AfterSaved); ok {
+	if as, ok := any(model).(AfterSaved); ok {
 		as.AfterSaved(ctx, m.GetDB(), diffAttrs)
 	}
 	return
 }
 
-func (m *Model[T]) Delete(ctx context.Context, primaryKeyValue any) (err error) {
+func (m *Model[T]) Delete(ctx context.Context, primaryKey any) (primaryKeyValue any, err error) {
 	if !m.HasScenario(schema.ScenarioDelete) {
-		return ErrPermissionDenied
+		return nil, ErrPermissionDenied
 	}
-	var model T
+	runtimeScope := RuntimeScopeFromContext(ctx)
+	if runtimeScope == nil {
+		runtimeScope = &RuntimeScope{
+			ModuleName: m.GetNaming().ModuleName,
+			TableName:  m.GetNaming().TableName,
+			Scenario:   schema.ScenarioDelete,
+		}
+		ctx = WithRuntimeScope(ctx, runtimeScope)
+	}
+	model := new(T)
 	err = m.GetDB().WithContext(ctx).Transaction(func(tx *gorm.DB) (errTx error) {
 		// 先查询完整记录
-		if errTx = tx.Where(map[string]any{m.primaryKey: primaryKeyValue}).First(&model).Error; errTx != nil {
+		if errTx = tx.Where(map[string]any{m.primaryKey: primaryKey}).First(model).Error; errTx != nil {
 			return errTx
 		}
+		primaryKeyValue = m.GetFieldValue(reflect.ValueOf(model), m.primaryKey)
 
 		// BeforeDelete hooks
-		if errTx = m.runBeforeHooks(ctx, tx, &model,
+		if errTx = m.runBeforeHooks(ctx, tx, model,
 			m.globalHooks.beforeDelete, m.localHooks.beforeDelete); errTx != nil {
 			return errTx
 		}
 
-		errTx = tx.Delete(&model).Error
+		errTx = tx.Delete(model).Error
 		return
 	})
 	if err != nil {
@@ -338,11 +393,9 @@ func (m *Model[T]) Delete(ctx context.Context, primaryKeyValue any) (err error) 
 	}
 
 	// AfterDelete hooks
-	m.runAfterDeleteHooks(ctx, m.GetDB(), &model,
-		m.globalHooks.afterDelete, m.localHooks.afterDelete)
-
+	m.runAfterDeleteHooks(ctx, m.GetDB(), model, m.globalHooks.afterDelete, m.localHooks.afterDelete)
 	// 兼容现有接口式 hook
-	if ad, ok := any(&model).(AfterDeleted); ok {
+	if ad, ok := any(model).(AfterDeleted); ok {
 		ad.AfterDeleted(ctx, m.GetDB())
 	}
 	return
@@ -352,15 +405,22 @@ func (m *Model[T]) Detail(ctx context.Context, primaryKey any) (model *T, err er
 	if !m.HasScenario(schema.ScenarioDetail) {
 		return model, ErrPermissionDenied
 	}
-	var (
-		modelValue T
-	)
+	model = new(T)
+	runtimeScope := RuntimeScopeFromContext(ctx)
+	if runtimeScope == nil {
+		runtimeScope = &RuntimeScope{
+			ModuleName: m.GetNaming().ModuleName,
+			TableName:  m.GetNaming().TableName,
+			Scenario:   schema.ScenarioDetail,
+		}
+		ctx = WithRuntimeScope(ctx, runtimeScope)
+	}
 	if err = m.GetDB().WithContext(ctx).Where(map[string]any{
 		m.primaryKey: primaryKey,
-	}).First(&modelValue).Error; err != nil {
+	}).First(model).Error; err != nil {
 		return
 	}
-	return &modelValue, nil
+	return model, nil
 }
 
 func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *query.Builder) ([]*T, error) {
@@ -377,6 +437,15 @@ func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *qu
 	}
 	if limit > 0 {
 		listBuilder.Limit(limit)
+	}
+	runtimeScope := RuntimeScopeFromContext(ctx)
+	if runtimeScope == nil {
+		runtimeScope = &RuntimeScope{
+			ModuleName: m.GetNaming().ModuleName,
+			TableName:  m.GetNaming().TableName,
+			Scenario:   schema.ScenarioList,
+		}
+		ctx = WithRuntimeScope(ctx, runtimeScope)
 	}
 	search := query.New(m.GetDB(), model, listBuilder)
 	values := make([]*T, 0)

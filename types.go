@@ -40,15 +40,15 @@ type (
 	}
 
 	CreateResult struct {
-		ID string `json:"id"`
+		ID any `json:"id"`
 	}
 
 	UpdateResult struct {
-		ID string `json:"id"`
+		ID any `json:"id"`
 	}
 
 	DeletedResult struct {
-		ID string `json:"id"`
+		ID any `json:"id"`
 	}
 
 	PageResult struct {
@@ -64,21 +64,21 @@ type (
 		ID        uint           `json:"id" gorm:"primarykey"`
 		CreatedAt int64          `json:"created_at" gorm:"autoCreateTime"`
 		UpdatedAt int64          `json:"updated_at" gorm:"autoUpdateTime"`
-		DeletedAt gorm.DeletedAt `gorm:"index"`
+		DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
 	}
 
 	TenantModel struct {
 		BaseModel
-		TenantID string `gorm:"column:tenant_id;type:char(60);index"`
+		TenantID string `json:"tenant_id" gorm:"column:tenant_id;type:char(60);index"`
 	}
 )
 
 type (
 	// ResolveTenantFunc 获取租户信息
-	ResolveTenantFunc func(ctx context.Context, r *http.Request) string
+	ResolveTenantFunc func(ctx context.Context, r *http.Request) (string, error)
 
 	// ResolveUserFunc 获取用户信息
-	ResolveUserFunc func(ctx context.Context, r *http.Request) string
+	ResolveUserFunc func(ctx context.Context, r *http.Request) (string, error)
 )
 
 type (
@@ -100,5 +100,20 @@ type (
 	// 删除之后的回调, 不在删除的事务内,是真正保存到数据库以后才执行的回调
 	AfterSaved interface {
 		AfterSaved(ctx context.Context, tx *gorm.DB, diff []*DiffAttr)
+	}
+)
+
+type (
+	TypeValue[T any] struct {
+		Label string `json:"label"`
+		Value T      `json:"value"`
+	}
+
+	TierValue[T comparable] struct {
+		Label    string          `json:"label"`
+		Value    T               `json:"value"`
+		Parent   T               `json:"-"`
+		Used     bool            `json:"-"`
+		Children []*TierValue[T] `json:"children,omitempty"`
 	}
 )

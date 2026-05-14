@@ -190,7 +190,7 @@ func TestDeleteHookReceivesFullModel(t *testing.T) {
 	}
 
 	// Delete it
-	err = model.Delete(context.Background(), m.ID)
+	_, err = model.Delete(context.Background(), m.ID)
 	if err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}

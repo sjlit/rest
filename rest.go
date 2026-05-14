@@ -1,12 +1,32 @@
 package rest
 
-import "reflect"
+import (
+	"context"
+	"fmt"
+	"reflect"
+
+	"gorm.io/gorm"
+)
+
+func recursiveTier[T comparable](parent T, values []*TierValue[T]) []*TierValue[T] {
+	items := make([]*TierValue[T], 0, len(values)/2)
+	for idx, row := range values {
+		if row.Used {
+			continue
+		}
+		if row.Parent == parent {
+			values[idx].Used = true
+			row.Children = recursiveTier(row.Value, values)
+			items = append(items, row)
+		}
+	}
+	return items
+}
 
 func IsEmpty(i any) bool {
 	if i == nil {
 		return true
 	}
-
 	v := reflect.ValueOf(i)
 	switch v.Kind() {
 	case reflect.String:
@@ -21,9 +41,94 @@ func IsEmpty(i any) bool {
 		return v.Uint() == 0
 	case reflect.Float32, reflect.Float64:
 		return v.Float() == 0
-	case reflect.Ptr, reflect.Map, reflect.Slice,
+	case reflect.Pointer, reflect.Map, reflect.Slice,
 		reflect.Chan, reflect.Func, reflect.Interface:
 		return v.IsNil()
 	}
 	return false
+}
+
+func ModelTypes[T any](ctx context.Context, db *gorm.DB, model any, domainName, labelColumn, valueColumn string) (values []*TypeValue[T], err error) {
+	var tx *gorm.DB
+	if ctx == nil {
+		tx = db
+	} else {
+		tx = db.WithContext(ctx)
+	}
+	result := make([]map[string]any, 0, 10)
+	if domainName == "" {
+		err = tx.Model(model).Select(labelColumn, valueColumn).Scan(&result).Error
+	} else {
+		err = tx.Model(model).Select(labelColumn, valueColumn).Where("domain=?", domainName).Scan(&result).Error
+	}
+	if err != nil {
+		return
+	}
+	values = make([]*TypeValue[T], 0, len(result))
+	for _, pairs := range result {
+		feed := &TypeValue[T]{}
+		for k, v := range pairs {
+			if k == labelColumn {
+				if s, ok := v.(string); ok {
+					feed.Label = s
+				} else {
+					feed.Label = fmt.Sprint(v)
+				}
+				//这里不直接返回, 有可能key和value是同一个字段
+			}
+			if k == valueColumn {
+				if p, ok := v.(T); ok {
+					feed.Value = p
+				}
+			}
+		}
+		values = append(values, feed)
+	}
+	return values, nil
+}
+
+// ModelTiers 查询指定模型的层级数据
+func ModelTiers[T comparable](ctx context.Context, db *gorm.DB, model any, domainName, parentColumn, labelColumn, valueColumn string) (values []*TierValue[T], err error) {
+	var tx *gorm.DB
+	if ctx == nil {
+		tx = db
+	} else {
+		tx = db.WithContext(ctx)
+	}
+	result := make([]map[string]any, 0, 10)
+	if domainName == "" {
+		err = tx.Model(model).Select(parentColumn, labelColumn, valueColumn).Scan(&result).Error
+	} else {
+		err = tx.Model(model).Select(parentColumn, labelColumn, valueColumn).Where("domain=?", domainName).Scan(&result).Error
+	}
+	if err != nil {
+		return
+	}
+	values = make([]*TierValue[T], 0, len(result))
+	for _, pairs := range result {
+		feed := &TierValue[T]{}
+		for k, v := range pairs {
+			if k == parentColumn {
+				if p, ok := v.(T); ok {
+					feed.Parent = p
+				}
+				continue
+			}
+			if k == labelColumn {
+				if s, ok := v.(string); ok {
+					feed.Label = s
+				} else {
+					feed.Label = fmt.Sprint(v)
+				}
+			}
+			if k == valueColumn {
+				if p, ok := v.(T); ok {
+					feed.Value = p
+				}
+			}
+		}
+		values = append(values, feed)
+	}
+	var none T
+	return recursiveTier(none, values), nil
 }

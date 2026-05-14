@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"path"
 	"reflect"
@@ -119,7 +120,7 @@ func (r *Resource[T]) buildQuery(req *http.Request, schemas []schema.Schema) *qu
 			if row.Attributes.Match == schema.MatchExactly {
 				builder.Where(row.Column, query.OpEq, formValue)
 			} else {
-				builder.Where(row.Column, query.OpLike, formValue)
+				builder.Where(row.Column, query.OpLike, formValue+"%")
 			}
 		case schema.FormatTime, schema.FormatDate, schema.FormatDatetime, schema.FormatTimestamp:
 			var sep string
@@ -144,7 +145,7 @@ func (r *Resource[T]) buildQuery(req *http.Request, schemas []schema.Schema) *qu
 				if row.Attributes.Match == schema.MatchExactly {
 					builder.Where(row.Column, query.OpEq, formValue)
 				} else {
-					builder.Where(row.Column, query.OpLike, formValue)
+					builder.Where(row.Column, query.OpLike, formValue+"%")
 				}
 			} else {
 				builder.Where(row.Column, query.OpEq, formValue)
@@ -182,18 +183,23 @@ func (r *Resource[T]) findPrimaryKey(req *http.Request, scenario string) string 
 	return ""
 }
 
-func (r *Resource[T]) getRuntimeScope(req *http.Request) *RuntimeScope {
-	runtimeScope := &RuntimeScope{
+func (r *Resource[T]) getRuntimeScope(req *http.Request) (runtimeScope *RuntimeScope, err error) {
+	runtimeScope = &RuntimeScope{
 		ModuleName: r.model.GetNaming().ModuleName,
 		TableName:  r.model.GetNaming().TableName,
+		Context:    r.model.db.Statement.Context,
 	}
 	if r.userResolve != nil {
-		runtimeScope.User = r.userResolve(req.Context(), req)
+		if runtimeScope.User, err = r.userResolve(req.Context(), req); err != nil {
+			return
+		}
 	}
 	if r.tenantResolve != nil {
-		runtimeScope.TenantID = r.tenantResolve(req.Context(), req)
+		if runtimeScope.TenantID, err = r.tenantResolve(req.Context(), req); err != nil {
+			return
+		}
 	}
-	return runtimeScope
+	return runtimeScope, nil
 }
 
 func (r *Resource[T]) Register() {
@@ -243,55 +249,85 @@ func (r *Resource[T]) Respond(res http.ResponseWriter, req *http.Request, data a
 
 func (r *Resource[T]) Create(res http.ResponseWriter, req *http.Request) {
 	var (
-		err        error
-		modelValue T
+		err          error
+		modelValue   T
+		runtimeScope *RuntimeScope
 	)
 	if err = json.NewDecoder(req.Body).Decode(&modelValue); err != nil {
 		r.Respond(res, req, ErrPayloadInvalid)
 		return
 	}
-	runtimeScope := r.getRuntimeScope(req)
+	if runtimeScope, err = r.getRuntimeScope(req); err != nil {
+		r.Respond(res, req, ErrUnavailable)
+		return
+	}
 	runtimeScope.Scenario = schema.ScenarioCreate
 	ctx := WithRuntimeScope(req.Context(), runtimeScope)
 	if _, err = r.model.Create(ctx, &modelValue); err != nil {
 		r.Respond(res, req, err)
 		return
 	}
-	r.Respond(res, req, modelValue)
+	r.Respond(res, req, CreateResult{
+		ID: r.model.GetFieldValue(reflect.ValueOf(modelValue), r.model.primaryKey),
+	})
 }
 
 func (r *Resource[T]) Update(res http.ResponseWriter, req *http.Request) {
 	var (
-		err        error
-		modelValue T
-		primaryKey string
+		err          error
+		buf          []byte
+		primaryKey   string
+		runtimeScope *RuntimeScope
 	)
-	if err = json.NewDecoder(req.Body).Decode(&modelValue); err != nil {
+	modelValue := new(T)
+	mapValue := make(map[string]any)
+	if buf, err = io.ReadAll(req.Body); err != nil {
 		r.Respond(res, req, ErrPayloadInvalid)
 		return
 	}
-	runtimeScope := r.getRuntimeScope(req)
+	if err = json.Unmarshal(buf, modelValue); err != nil {
+		r.Respond(res, req, ErrPayloadInvalid)
+		return
+	}
+	if err = json.Unmarshal(buf, &mapValue); err != nil {
+		r.Respond(res, req, ErrPayloadInvalid)
+		return
+	}
+	if runtimeScope, err = r.getRuntimeScope(req); err != nil {
+		r.Respond(res, req, ErrUnavailable)
+		return
+	}
 	runtimeScope.Scenario = schema.ScenarioUpdate
 	ctx := WithRuntimeScope(req.Context(), runtimeScope)
 	primaryKey = r.findPrimaryKey(req, schema.ScenarioUpdate)
-	if _, err = r.model.Update(ctx, primaryKey, modelValue); err != nil {
+	columns := make([]string, 0, len(mapValue))
+	for k := range mapValue {
+		columns = append(columns, k)
+	}
+	var primaryKeyValue any
+	if primaryKeyValue, err = r.model.Update(ctx, primaryKey, modelValue, columns...); err != nil {
 		r.Respond(res, req, ErrUpdateFailed)
 	} else {
 		r.Respond(res, req, UpdateResult{
-			ID: primaryKey,
+			ID: primaryKeyValue,
 		})
 	}
 }
 
 func (r *Resource[T]) Delete(res http.ResponseWriter, req *http.Request) {
 	var (
-		err error
+		err          error
+		runtimeScope *RuntimeScope
 	)
-	runtimeScope := r.getRuntimeScope(req)
+	if runtimeScope, err = r.getRuntimeScope(req); err != nil {
+		r.Respond(res, req, ErrUnavailable)
+		return
+	}
 	runtimeScope.Scenario = schema.ScenarioDelete
 	ctx := WithRuntimeScope(req.Context(), runtimeScope)
-	primaryKeyValue := r.findPrimaryKey(req, schema.ScenarioDelete)
-	if err = r.model.Delete(ctx, primaryKeyValue); err != nil {
+	primaryKey := r.findPrimaryKey(req, schema.ScenarioDelete)
+	var primaryKeyValue any
+	if primaryKeyValue, err = r.model.Delete(ctx, primaryKey); err != nil {
 		r.Respond(res, req, ErrDeleteFailed)
 	} else {
 		r.Respond(res, req, DeletedResult{
@@ -302,12 +338,16 @@ func (r *Resource[T]) Delete(res http.ResponseWriter, req *http.Request) {
 
 func (r *Resource[T]) Detail(res http.ResponseWriter, req *http.Request) {
 	var (
-		err         error
-		schemas     []schema.Schema
-		modelValue  *T
-		valueFormat string
+		err          error
+		schemas      []schema.Schema
+		modelValue   *T
+		valueFormat  string
+		runtimeScope *RuntimeScope
 	)
-	runtimeScope := r.getRuntimeScope(req)
+	if runtimeScope, err = r.getRuntimeScope(req); err != nil {
+		r.Respond(res, req, ErrUnavailable)
+		return
+	}
 	runtimeScope.Scenario = schema.ScenarioDetail
 	ctx := WithRuntimeScope(req.Context(), runtimeScope)
 	if schemas, err = schema.GetVisibleSchemas(ctx, r.model.GetDB(), r.model.GetNaming().ModuleName, r.model.GetNaming().TableName, schema.ScenarioDetail); err != nil {
@@ -335,6 +375,7 @@ func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
 		modelValues   []*T
 		totalCount    int64
 		valueFormat   string
+		runtimeScope  *RuntimeScope
 		searchSchemas []schema.Schema
 		listSchemas   []schema.Schema
 	)
@@ -350,7 +391,10 @@ func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
 	if pageIndex < 0 {
 		pageIndex = 0
 	}
-	runtimeScope := r.getRuntimeScope(req)
+	if runtimeScope, err = r.getRuntimeScope(req); err != nil {
+		r.Respond(res, req, ErrUnavailable)
+		return
+	}
 	runtimeScope.Scenario = schema.ScenarioSearch
 	ctx := WithRuntimeScope(req.Context(), runtimeScope)
 	if searchSchemas, err = schema.GetVisibleSchemas(ctx, r.model.GetDB(), r.model.GetNaming().ModuleName, r.model.GetNaming().TableName, schema.ScenarioSearch); err != nil {
@@ -363,6 +407,9 @@ func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
 	}
 	runtimeScope.Schemas = listSchemas
 	queryBuilder := r.buildQuery(req, searchSchemas)
+	if runtimeScope.TenantID != "" {
+		queryBuilder.Where(TenantId, query.OpEq, runtimeScope.TenantID)
+	}
 	if totalCount, modelValues, err = r.model.Paginate(ctx, pageIndex, pageSize, queryBuilder); err != nil {
 		r.Respond(res, req, ErrUnavailable)
 		return
@@ -382,11 +429,15 @@ func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
 
 func (r *Resource[T]) Export(res http.ResponseWriter, req *http.Request) {
 	var (
-		err         error
-		modelValues []*T
-		schemas     []schema.Schema
+		err          error
+		modelValues  []*T
+		schemas      []schema.Schema
+		runtimeScope *RuntimeScope
 	)
-	runtimeScope := r.getRuntimeScope(req)
+	if runtimeScope, err = r.getRuntimeScope(req); err != nil {
+		r.Respond(res, req, ErrUnavailable)
+		return
+	}
 	runtimeScope.Scenario = schema.ScenarioExport
 	ctx := WithRuntimeScope(req.Context(), runtimeScope)
 	if schemas, err = schema.GetVisibleSchemas(ctx, r.model.GetDB(), r.model.GetNaming().ModuleName, r.model.GetNaming().TableName, schema.ScenarioExport); err != nil {
@@ -394,6 +445,9 @@ func (r *Resource[T]) Export(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	queryBuilder := r.buildQuery(req, schemas)
+	if runtimeScope.TenantID != "" {
+		queryBuilder.Where(TenantId, query.OpEq, runtimeScope.TenantID)
+	}
 	if modelValues, err = r.model.List(ctx, 0, 1000, queryBuilder); err != nil {
 		r.Respond(res, req, ErrUnavailable)
 		return
