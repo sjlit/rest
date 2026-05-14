@@ -171,14 +171,7 @@ func (m *Model[T]) runAfterHooks(
 ) {
 	for _, fns := range [][]erasedAfterHookFunc{globalFns, localFns} {
 		for _, fn := range fns {
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						// 记录 panic，不阻断主流程
-					}
-				}()
-				fn(ctx, db, model, diffAttrs)
-			}()
+			fn(ctx, db, model, diffAttrs)
 		}
 	}
 }

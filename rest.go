@@ -48,7 +48,7 @@ func IsEmpty(i any) bool {
 	return false
 }
 
-func ModelTypes[T any](ctx context.Context, db *gorm.DB, model any, domainName, labelColumn, valueColumn string) (values []*TypeValue[T], err error) {
+func ModelTypes[T any](ctx context.Context, db *gorm.DB, model any, tenant, labelColumn, valueColumn string) (values []*TypeValue[T], err error) {
 	var tx *gorm.DB
 	if ctx == nil {
 		tx = db
@@ -56,10 +56,10 @@ func ModelTypes[T any](ctx context.Context, db *gorm.DB, model any, domainName, 
 		tx = db.WithContext(ctx)
 	}
 	result := make([]map[string]any, 0, 10)
-	if domainName == "" {
+	if tenant == "" {
 		err = tx.Model(model).Select(labelColumn, valueColumn).Scan(&result).Error
 	} else {
-		err = tx.Model(model).Select(labelColumn, valueColumn).Where("domain=?", domainName).Scan(&result).Error
+		err = tx.Model(model).Select(labelColumn, valueColumn).Where(TenantId+"=?", tenant).Scan(&result).Error
 	}
 	if err != nil {
 		return
@@ -88,7 +88,7 @@ func ModelTypes[T any](ctx context.Context, db *gorm.DB, model any, domainName, 
 }
 
 // ModelTiers 查询指定模型的层级数据
-func ModelTiers[T comparable](ctx context.Context, db *gorm.DB, model any, domainName, parentColumn, labelColumn, valueColumn string) (values []*TierValue[T], err error) {
+func ModelTiers[T comparable](ctx context.Context, db *gorm.DB, model any, tenant, parentColumn, labelColumn, valueColumn string) (values []*TierValue[T], err error) {
 	var tx *gorm.DB
 	if ctx == nil {
 		tx = db
@@ -96,10 +96,10 @@ func ModelTiers[T comparable](ctx context.Context, db *gorm.DB, model any, domai
 		tx = db.WithContext(ctx)
 	}
 	result := make([]map[string]any, 0, 10)
-	if domainName == "" {
+	if tenant == "" {
 		err = tx.Model(model).Select(parentColumn, labelColumn, valueColumn).Scan(&result).Error
 	} else {
-		err = tx.Model(model).Select(parentColumn, labelColumn, valueColumn).Where("domain=?", domainName).Scan(&result).Error
+		err = tx.Model(model).Select(parentColumn, labelColumn, valueColumn).Where(TenantId+"=?", tenant).Scan(&result).Error
 	}
 	if err != nil {
 		return
