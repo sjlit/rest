@@ -53,6 +53,10 @@ func (m *Model[T]) GetPrimaryKey() string {
 	return m.primaryKey
 }
 
+func (m *Model[T]) OpenAPIEnabled() bool {
+	return m.opts.enableOpenAPI
+}
+
 func (m *Model[T]) GetNaming() Naming {
 	return m.naming
 }
