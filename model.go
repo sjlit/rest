@@ -171,7 +171,14 @@ func (m *Model[T]) runAfterHooks(
 ) {
 	for _, fns := range [][]erasedAfterHookFunc{globalFns, localFns} {
 		for _, fn := range fns {
-			fn(ctx, db, model, diffAttrs)
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						// 记录 panic，不阻断主流程
+					}
+				}()
+				fn(ctx, db, model, diffAttrs)
+			}()
 		}
 	}
 }
@@ -427,7 +434,10 @@ func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *qu
 		model T
 		err   error
 	)
-	listBuilder := queryBuilder.Clone()
+	listBuilder := query.NewBuilder()
+	if queryBuilder != nil {
+		listBuilder = queryBuilder.Clone()
+	}
 	if offset >= 0 {
 		listBuilder.Offset(offset)
 	}
