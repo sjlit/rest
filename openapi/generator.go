@@ -266,7 +266,7 @@ func (s *genState) buildSchemaRef(module, table, scenario string) *SchemaRef {
 	}
 
 	for _, sc := range schemas {
-		prop := s.schemaToProperty(sc, scenario)
+		prop := s.schemaToProperty(sc)
 		ref.Properties[sc.Column] = prop
 	}
 
@@ -274,7 +274,7 @@ func (s *genState) buildSchemaRef(module, table, scenario string) *SchemaRef {
 	return &SchemaRef{Ref: "#/components/schemas/" + name}
 }
 
-func (s *genState) schemaToProperty(sc schema.Schema, scenario string) *SchemaRef {
+func (s *genState) schemaToProperty(sc schema.Schema) *SchemaRef {
 	if sc.Relations.Type != "" {
 		assocRef := s.buildSchemaRef(sc.Relations.Module, sc.Relations.Table, schema.ScenarioDetail)
 		switch sc.Relations.Type {
