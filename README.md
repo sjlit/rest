@@ -11,6 +11,7 @@
 - **类型安全查询构建器** — 支持 WHERE、JOIN、GROUP BY、HAVING、ORDER BY、分页、子查询（IN / EXISTS）、聚合函数（COUNT / SUM / AVG / MAX / MIN）
 - **数据格式化器** — 内置多种字段格式（日期、时间、百分比、时长、下拉选项等），支持自定义扩展
 - **多租户支持** — 内置 `tenant_id` 字段隔离机制
+- **生命周期钩子系统** — 支持全局 any 注册与局部泛型注册，覆盖 Before/After Create/Update/Delete 和 AfterSaved，事务内阻断 + 事务外副作用
 - **运行时作用域** — 通过 Context 传递模块、表、场景等运行时信息，便于插件和钩子扩展
 - **SQL 注入防护** — 查询构建器内置字段名校验和非法字符过滤
 
@@ -86,6 +87,7 @@ func main() {
 .
 ├── rest.go                  # 包入口
 ├── model.go                 # 泛型 Model[T] 定义与 CRUD 操作
+├── hook.go                  # 生命周期钩子注册系统
 ├── options.go               # 模型配置选项
 ├── scope.go                 # 运行时作用域（Context 传递）
 ├── tenant.go                # 多租户常量
@@ -139,6 +141,77 @@ model.Search(ctx, offset, limit, queryBuilder)
 | `WithModuleName(name)` | 设置模块名称（用于 Schema 隔离） |
 | `WithTenant()` | 启用多租户模式 |
 | `WithScenarios(...)` | 限制模型可用的场景 |
+
+---
+
+## 生命周期钩子
+
+支持注册式（非侵入式）生命周期钩子，**全局 any 注册**（所有模型共享）与**局部泛型注册**（单实例类型安全）双层设计。
+
+### 支持的钩子阶段
+
+| 阶段 | 执行时机 | 返回值 | 说明 |
+|------|----------|--------|------|
+| `BeforeCreate` | 事务内，Create 之前 | `error` | 失败阻断创建 |
+| `AfterCreate` | 事务外，Create 之后 | 无 | 副作用，失败不阻断 |
+| `BeforeUpdate` | 事务内，Update 之前 | `error` | 失败阻断更新 |
+| `AfterUpdate` | 事务外，Update 之后 | 无 | 副作用，失败不阻断 |
+| `AfterSaved` | 事务外，Create/Update 共用 | 无 | 副作用，失败不阻断 |
+| `BeforeDelete` | 事务内，Delete 之前 | `error` | 失败阻断删除 |
+| `AfterDelete` | 事务外，Delete 之后 | 无 | 副作用，失败不阻断 |
+
+### 全局注册（any，所有模型共享）
+
+```go
+// 所有模型创建后都记录审计日志
+rest.RegisterAfterCreate(func(ctx context.Context, db *gorm.DB, model any, diff []*rest.DiffAttr) {
+    log.Printf("[AUDIT] %T created, diff: %d", model, len(diff))
+})
+
+// 所有模型删除前检查依赖
+rest.RegisterBeforeDelete(func(ctx context.Context, db *gorm.DB, model any) error {
+    switch m := model.(type) {
+    case *User:
+        if hasOrders(db, m.ID) {
+            return errors.New("user has orders")
+        }
+    }
+    return nil
+})
+```
+
+### 局部注册（泛型，类型安全）
+
+```go
+model, _ := rest.NewModel[User](rest.WithDB(db))
+
+// 只有这个 model 实例会触发
+model.RegisterAfterCreate(func(ctx context.Context, db *gorm.DB, u *User, diff []*rest.DiffAttr) {
+    go notification.Send("user_created", u.ID)
+})
+
+model.RegisterBeforeUpdate(func(ctx context.Context, db *gorm.DB, u *User) error {
+    if u.Email == "" {
+        return errors.New("email required")
+    }
+    return nil
+})
+```
+
+### 执行顺序
+
+每个操作的执行顺序固定为：**全局钩子 → 局部钩子 → 接口式钩子**。
+
+以 `Create` 为例：
+1. 全局 `BeforeCreate` → 局部 `BeforeCreate`
+2. GORM `tx.Create(model)`
+3. 全局 `AfterCreate` → 局部 `AfterCreate`
+4. 全局 `AfterSaved` → 局部 `AfterSaved`
+5. 接口式 `AfterCreated` / `AfterSaved`（兼容现有接口）
+
+### 与现有接口式钩子共存
+
+注册式钩子与原有接口式钩子（`AfterCreated` / `AfterUpdated` / `AfterDeleted` / `AfterSaved`）**完全兼容**，两者可同时使用。
 
 ---
 
