@@ -29,6 +29,9 @@ type IntegUser struct {
 func TestIntegrationPreloadDetail(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	if err != nil {
+		if strings.Contains(err.Error(), "cgo") || strings.Contains(err.Error(), "stub") {
+			t.Skip("sqlite requires cgo")
+		}
 		t.Fatalf("failed to open db: %v", err)
 	}
 	if err := db.AutoMigrate(&schema.Schema{}, &IntegUser{}, &IntegOrder{}); err != nil {
@@ -87,6 +90,9 @@ func TestIntegrationPreloadDetail(t *testing.T) {
 func TestIntegrationPreloadList(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	if err != nil {
+		if strings.Contains(err.Error(), "cgo") || strings.Contains(err.Error(), "stub") {
+			t.Skip("sqlite requires cgo")
+		}
 		t.Fatalf("failed to open db: %v", err)
 	}
 	if err := db.AutoMigrate(&schema.Schema{}, &IntegUser{}, &IntegOrder{}); err != nil {
@@ -177,6 +183,9 @@ func TestIntegrationOpenAPIEndpoint(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("expected Content-Type application/json, got %s", ct)
+	}
 
 	var spec openapi.Spec
 	if err := json.Unmarshal(rec.Body.Bytes(), &spec); err != nil {
@@ -185,6 +194,9 @@ func TestIntegrationOpenAPIEndpoint(t *testing.T) {
 
 	if spec.OpenAPI != "3.0.3" {
 		t.Errorf("openapi version: want 3.0.3, got %s", spec.OpenAPI)
+	}
+	if _, ok := spec.Paths["/api/v1/integration/user"]; !ok {
+		t.Error("expected path /api/v1/integration/user in spec")
 	}
 	if len(spec.Paths) == 0 {
 		t.Error("expected non-empty paths")
