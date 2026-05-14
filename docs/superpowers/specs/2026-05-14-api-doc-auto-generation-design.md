@@ -97,16 +97,18 @@ func (g *Generator) Generate(
 
 ## 5. Resource 路由 → OpenAPI Paths
 
-基于 `Resource.Register()` 注册的路由，每个 Resource 自动生成以下 6 个 PathItem：
+OpenAPI 的 `paths` 键直接复用 `Resource.buildUri` 返回的 URI，确保文档路径与运行时注册的路由**严格一致**。`Generator` 接收 `(scenario string) → (method, uri)` 的映射结果，而非硬编码前缀。
+
+以 `prefix="/api/v1", module="rest", singular="user", pluralize="users"` 为例：
 
 | 方法 | 路径 | Operation | 说明 |
 |---|---|---|---|
-| `GET` | `/{prefix}` | `list` | 查询列表 |
-| `POST` | `/{prefix}` | `create` | 创建 |
-| `GET` | `/{prefix}/{id}` | `detail` | 详情 |
-| `PUT` | `/{prefix}/{id}` | `update` | 更新 |
-| `DELETE` | `/{prefix}/{id}` | `delete` | 删除 |
-| `GET` | `/{prefix}/export` | `export` | 导出 |
+| `POST` | `/api/v1/rest/user` | `create` | 创建 |
+| `PUT` | `/api/v1/rest/user/{id}` | `update` | 更新 |
+| `DELETE` | `/api/v1/rest/user/{id}` | `delete` | 删除 |
+| `GET` | `/api/v1/rest/users` | `list` | 查询列表 |
+| `GET` | `/api/v1/rest/user/detail/{id}` | `detail` | 详情 |
+| `GET` | `/api/v1/rest/user/export` | `export` | 导出 |
 
 ### 5.1 参数定义
 
