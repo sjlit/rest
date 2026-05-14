@@ -2,6 +2,7 @@ package openapi
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"git.nobla.cn/golang/rest/schema"
@@ -37,11 +38,205 @@ func (g *Generator) Generate(ctx context.Context, db *gorm.DB, cfg Config) (*Spe
 		Paths:      make(map[string]PathItem),
 		Components: Components{Schemas: make(map[string]*SchemaRef)},
 	}
-	// TODO: Task 4
-	_ = ctx
-	_ = db
-	_ = cfg
+
+	state := &genState{
+		db:      db,
+		ctx:     ctx,
+		spec:    spec,
+		cfg:     cfg,
+		visited: make(map[string]bool),
+	}
+
+	for _, scenario := range cfg.Scenarios {
+		method, uri := cfg.BuildUri(scenario)
+		if uri == "" {
+			continue
+		}
+
+		openAPIPath := uriToOpenAPIPath(uri)
+		visibleSchemas, err := schema.GetVisibleSchemas(ctx, db, cfg.ModuleName, cfg.TableName, scenario)
+		if err != nil {
+			continue
+		}
+
+		op := state.buildOperation(scenario, visibleSchemas)
+		if op == nil {
+			continue
+		}
+
+		item := spec.Paths[openAPIPath]
+		switch strings.ToUpper(method) {
+		case "GET":
+			item.Get = op
+		case "POST":
+			item.Post = op
+		case "PUT":
+			item.Put = op
+		case "DELETE":
+			item.Delete = op
+		}
+		spec.Paths[openAPIPath] = item
+	}
+
 	return spec, nil
+}
+
+type genState struct {
+	db      *gorm.DB
+	ctx     context.Context
+	spec    *Spec
+	cfg     Config
+	visited map[string]bool
+}
+
+func (s *genState) buildOperation(scenario string, schemas []schema.Schema) *Operation {
+	var (
+		op          = &Operation{}
+		parameters  []Parameter
+		requestBody *RequestBody
+		responses   = make(map[string]Response)
+	)
+
+	cfg := s.cfg
+	baseName := schemaName(cfg.ModuleName, cfg.TableName)
+
+	switch scenario {
+	case schema.ScenarioCreate:
+		op.Summary = fmt.Sprintf("创建 %s", cfg.Singular)
+		op.OperationID = fmt.Sprintf("create%s", toPascal(cfg.Singular))
+		requestBody = s.buildRequestBody(baseName+"Create", cfg.ModuleName, cfg.TableName, scenario)
+		responses["200"] = Response{
+			Description: "成功",
+			Content: map[string]MediaType{
+				"application/json": {Schema: &SchemaRef{Type: "object", Properties: map[string]*SchemaRef{
+					"id": {Type: "string"},
+				}}},
+			},
+		}
+	case schema.ScenarioUpdate:
+		op.Summary = fmt.Sprintf("更新 %s", cfg.Singular)
+		op.OperationID = fmt.Sprintf("update%s", toPascal(cfg.Singular))
+		parameters = append(parameters, s.buildIDParameter(cfg.PrimaryKey, schemas))
+		requestBody = s.buildRequestBody(baseName+"Update", cfg.ModuleName, cfg.TableName, scenario)
+		responses["200"] = Response{
+			Description: "成功",
+			Content: map[string]MediaType{
+				"application/json": {Schema: &SchemaRef{Type: "object", Properties: map[string]*SchemaRef{
+					"id": {Type: "string"},
+				}}},
+			},
+		}
+	case schema.ScenarioDelete:
+		op.Summary = fmt.Sprintf("删除 %s", cfg.Singular)
+		op.OperationID = fmt.Sprintf("delete%s", toPascal(cfg.Singular))
+		parameters = append(parameters, s.buildIDParameter(cfg.PrimaryKey, schemas))
+		responses["200"] = Response{
+			Description: "成功",
+			Content: map[string]MediaType{
+				"application/json": {Schema: &SchemaRef{Type: "object", Properties: map[string]*SchemaRef{
+					"id": {Type: "string"},
+				}}},
+			},
+		}
+	case schema.ScenarioDetail:
+		op.Summary = fmt.Sprintf("获取 %s 详情", cfg.Singular)
+		op.OperationID = fmt.Sprintf("detail%s", toPascal(cfg.Singular))
+		parameters = append(parameters, s.buildIDParameter(cfg.PrimaryKey, schemas))
+		parameters = append(parameters, Parameter{
+			Name:        "format",
+			In:          "query",
+			Description: "返回格式",
+			Schema:      &SchemaRef{Type: "string", Enum: []any{"raw", "both"}},
+		})
+		ref := s.buildSchemaRef(cfg.ModuleName, cfg.TableName, scenario)
+		responses["200"] = Response{
+			Description: "成功",
+			Content: map[string]MediaType{
+				"application/json": {Schema: ref},
+			},
+		}
+	case schema.ScenarioSearch:
+		op.Summary = fmt.Sprintf("查询 %s 列表", cfg.Plural)
+		op.OperationID = fmt.Sprintf("list%s", toPascal(cfg.Plural))
+		parameters = append(parameters,
+			Parameter{Name: "page", In: "query", Schema: &SchemaRef{Type: "integer"}},
+			Parameter{Name: "page_size", In: "query", Schema: &SchemaRef{Type: "integer"}},
+			Parameter{Name: "query", In: "query", Schema: &SchemaRef{Type: "string"}, Description: "AST 查询表达式"},
+			Parameter{Name: "format", In: "query", Schema: &SchemaRef{Type: "string", Enum: []any{"raw", "both"}}},
+		)
+		itemRef := s.buildSchemaRef(cfg.ModuleName, cfg.TableName, schema.ScenarioList)
+		responses["200"] = Response{
+			Description: "成功",
+			Content: map[string]MediaType{
+				"application/json": {
+					Schema: &SchemaRef{
+						Type: "object",
+						Properties: map[string]*SchemaRef{
+							"page":        {Type: "integer"},
+							"page_size":   {Type: "integer"},
+							"total_count": {Type: "integer"},
+							"data":        {Type: "array", Items: itemRef},
+						},
+					},
+				},
+			},
+		}
+	case schema.ScenarioExport:
+		op.Summary = fmt.Sprintf("导出 %s", cfg.Plural)
+		op.OperationID = fmt.Sprintf("export%s", toPascal(cfg.Plural))
+		parameters = append(parameters,
+			Parameter{Name: "query", In: "query", Schema: &SchemaRef{Type: "string"}, Description: "AST 查询表达式"},
+		)
+		responses["200"] = Response{
+			Description: "成功",
+			Content: map[string]MediaType{
+				"text/csv": {Schema: &SchemaRef{Type: "string", Format: "binary"}},
+			},
+		}
+	default:
+		return nil
+	}
+
+	op.Parameters = parameters
+	op.RequestBody = requestBody
+	op.Responses = responses
+	return op
+}
+
+func (s *genState) buildIDParameter(primaryKey string, schemas []schema.Schema) Parameter {
+	var pkType string
+	for _, sc := range schemas {
+		if sc.Column == primaryKey && sc.PrimaryKey > 0 {
+			pkType = mapSchemaType(sc.Type)
+			break
+		}
+	}
+	if pkType == "" {
+		pkType = "string"
+	}
+	return Parameter{
+		Name:     "id",
+		In:       "path",
+		Required: true,
+		Schema:   &SchemaRef{Type: pkType},
+	}
+}
+
+func (s *genState) buildRequestBody(refName, module, table, scenario string) *RequestBody {
+	ref := s.buildSchemaRef(module, table, scenario)
+	if ref.Ref == "" {
+		ref = &SchemaRef{Ref: "#/components/schemas/" + refName}
+		s.spec.Components.Schemas[refName] = ref
+	}
+	return &RequestBody{
+		Content: map[string]MediaType{
+			"application/json": {Schema: &SchemaRef{Ref: "#/components/schemas/" + refName}},
+		},
+	}
+}
+
+func (s *genState) buildSchemaRef(module, table, scenario string) *SchemaRef {
+	return &SchemaRef{Type: "object"}
 }
 
 func mapSchemaType(t string) string {
