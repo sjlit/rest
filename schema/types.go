@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"errors"
 	"net/http"
 )
@@ -58,3 +60,27 @@ var (
 	allowMethods         = []string{http.MethodPut, http.MethodPost}
 	timeSearchRangeEnums = []string{"minute", "hour", "day", "week", "month", "year"}
 )
+
+type Relation struct {
+	Type   string `json:"type"`
+	Name   string `json:"name"`
+	Module string `json:"module"`
+	Table  string `json:"table"`
+}
+
+func (r *Relation) Scan(value any) error {
+	if value == nil {
+		return nil
+	}
+	switch s := value.(type) {
+	case string:
+		return json.Unmarshal([]byte(s), r)
+	case []byte:
+		return json.Unmarshal(s, r)
+	}
+	return ErrUnsupportType
+}
+
+func (r Relation) Value() (driver.Value, error) {
+	return json.Marshal(r)
+}

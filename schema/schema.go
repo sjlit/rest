@@ -25,6 +25,7 @@ type (
 		Scenarios  Scenarios `json:"scenarios" gorm:"type:varchar(120)"`                           //场景
 		Rules      Rule      `json:"rules" gorm:"type:varchar(2048)"`                              //字段规则
 		Attributes Attribute `json:"attributes" gorm:"type:varchar(4096)"`                         //字段属性
+		Relations  Relation  `json:"relations" gorm:"type:varchar(2048)"`                          //关联关系
 		Position   int       `json:"position"`                                                     //字段排序位置
 	}
 )
