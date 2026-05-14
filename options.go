@@ -6,10 +6,11 @@ import (
 
 type (
 	options struct {
-		db           *gorm.DB
-		moduleName   string
-		enableTenant bool
-		scenarios    []string
+		db            *gorm.DB
+		moduleName    string
+		enableTenant  bool
+		scenarios     []string
+		enableOpenAPI bool
 	}
 
 	Option func(*options)
@@ -44,5 +45,11 @@ func WithTenant() Option {
 func WithScenarios(scenarios ...string) Option {
 	return func(opts *options) {
 		opts.scenarios = scenarios
+	}
+}
+
+func WithOpenAPI(enabled bool) Option {
+	return func(opts *options) {
+		opts.enableOpenAPI = enabled
 	}
 }
