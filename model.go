@@ -408,7 +408,10 @@ func (m *Model[T]) Detail(ctx context.Context, primaryKey any) (model *T, err er
 		}
 		ctx = WithRuntimeScope(ctx, runtimeScope)
 	}
-	if err = m.GetDB().WithContext(ctx).Where(map[string]any{
+	if schemas, err := schema.GetVisibleSchemas(ctx, m.GetDB(), m.naming.ModuleName, m.naming.TableName, schema.ScenarioDetail); err == nil {
+		runtimeScope.Schemas = schemas
+	}
+	if err = m.applyPreloads(ctx, m.GetDB().WithContext(ctx), runtimeScope.Schemas, schema.ScenarioDetail, make(map[string]bool), "").Where(map[string]any{
 		m.primaryKey: primaryKey,
 	}).First(model).Error; err != nil {
 		return
@@ -440,7 +443,11 @@ func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *qu
 		}
 		ctx = WithRuntimeScope(ctx, runtimeScope)
 	}
-	search := query.New(m.GetDB(), model, listBuilder)
+	if schemas, err := schema.GetVisibleSchemas(ctx, m.GetDB(), m.naming.ModuleName, m.naming.TableName, schema.ScenarioList); err == nil {
+		runtimeScope.Schemas = schemas
+	}
+	searchDB := m.applyPreloads(ctx, m.GetDB().WithContext(ctx), runtimeScope.Schemas, schema.ScenarioList, make(map[string]bool), "")
+	search := query.New(searchDB, model, listBuilder)
 	values := make([]*T, 0)
 	if err = search.All(ctx, &values); err != nil {
 		return nil, err
@@ -493,6 +500,35 @@ func (m *Model[T]) Cursor(ctx context.Context, cursor string, limit int, queryBu
 		nextCursor = encodeCursor(offset + limit)
 	}
 	return
+}
+
+func (m *Model[T]) applyPreloads(ctx context.Context, db *gorm.DB, schemas []schema.Schema, scenario string, visited map[string]bool, prefix string) *gorm.DB {
+	for _, s := range schemas {
+		if s.Relations.Type == "" {
+			continue
+		}
+		path := s.Relations.Name
+		if prefix != "" {
+			path = prefix + "." + path
+		}
+		db = db.Preload(path)
+
+		// 循环引用检测
+		key := s.Relations.Module + ":" + s.Relations.Table + ":" + path
+		if visited[key] {
+			continue
+		}
+		visited[key] = true
+
+		// 加载关联模型的 Schema 并递归
+		if s.Relations.Module != "" && s.Relations.Table != "" {
+			assocSchemas, err := schema.GetVisibleSchemas(ctx, m.GetDB(), s.Relations.Module, s.Relations.Table, scenario)
+			if err == nil && len(assocSchemas) > 0 {
+				db = m.applyPreloads(ctx, db, assocSchemas, scenario, visited, path)
+			}
+		}
+	}
+	return db
 }
 
 func NewModel[T any](opts ...Option) (v *Model[T], err error) {
