@@ -137,7 +137,7 @@ type TestUser struct {
 }
 
 func TestGenerate(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		if strings.Contains(err.Error(), "cgo") || strings.Contains(err.Error(), "stub") {
 			t.Skip("sqlite requires cgo")
@@ -200,11 +200,23 @@ func TestGenerate(t *testing.T) {
 	if len(spec.Paths) != 5 {
 		t.Fatalf("expected 5 paths, got %d", len(spec.Paths))
 	}
+	if spec.Paths["/api/v1/openapi_test/user"].Post == nil {
+		t.Fatal("expected POST /user")
+	}
 	if spec.Paths["/api/v1/openapi_test/user/{id}"].Put == nil {
 		t.Fatal("expected PUT /user/{id}")
 	}
+	if spec.Paths["/api/v1/openapi_test/user/{id}"].Delete == nil {
+		t.Fatal("expected DELETE /user/{id}")
+	}
 	if spec.Paths["/api/v1/openapi_test/user/detail/{id}"].Get == nil {
 		t.Fatal("expected GET /user/detail/{id}")
+	}
+	if spec.Paths["/api/v1/openapi_test/users"].Get == nil {
+		t.Fatal("expected GET /users")
+	}
+	if spec.Paths["/api/v1/openapi_test/user/export"].Get == nil {
+		t.Fatal("expected GET /user/export")
 	}
 
 	// Verify components/schemas exist
@@ -215,6 +227,21 @@ func TestGenerate(t *testing.T) {
 	baseName := schemaName("openapi_test", "test_users")
 	if _, ok := spec.Components.Schemas[baseName]; !ok {
 		t.Fatalf("expected schema %q in components", baseName)
+	}
+	userSchema := spec.Components.Schemas[baseName]
+	if userSchema == nil || userSchema.Properties == nil {
+		t.Fatalf("expected %q to have properties", baseName)
+	}
+	if _, ok := userSchema.Properties["name"]; !ok {
+		t.Errorf("expected %q to have 'name' property", baseName)
+	}
+	if _, ok := userSchema.Properties["age"]; !ok {
+		t.Errorf("expected %q to have 'age' property", baseName)
+	}
+	if ordersProp, ok := userSchema.Properties["orders"]; !ok {
+		t.Errorf("expected %q to have 'orders' property", baseName)
+	} else if ordersProp.Type != "array" || ordersProp.Items == nil {
+		t.Errorf("expected 'orders' to be an array with items")
 	}
 
 	// Verify association schema exists
