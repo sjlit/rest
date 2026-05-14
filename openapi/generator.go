@@ -236,7 +236,66 @@ func (s *genState) buildRequestBody(refName, module, table, scenario string) *Re
 }
 
 func (s *genState) buildSchemaRef(module, table, scenario string) *SchemaRef {
-	return &SchemaRef{Type: "object"}
+	key := module + ":" + table
+	name := schemaName(module, table)
+
+	// For the primary model, use scenario-specific naming for Create/Update
+	if module == s.cfg.ModuleName && table == s.cfg.TableName {
+		switch scenario {
+		case schema.ScenarioCreate:
+			name = name + "Create"
+		case schema.ScenarioUpdate:
+			name = name + "Update"
+		default:
+			// Detail, List, Export, Search use base name
+		}
+	}
+
+	if s.visited[key] {
+		return &SchemaRef{Ref: "#/components/schemas/" + name}
+	}
+	s.visited[key] = true
+
+	schemas, err := schema.GetVisibleSchemas(s.ctx, s.db, module, table, scenario)
+	if err != nil || len(schemas) == 0 {
+		return &SchemaRef{Type: "object"}
+	}
+
+	ref := &SchemaRef{
+		Type:       "object",
+		Properties: make(map[string]*SchemaRef),
+	}
+
+	for _, sc := range schemas {
+		prop := s.schemaToProperty(sc, scenario)
+		ref.Properties[sc.Column] = prop
+	}
+
+	s.spec.Components.Schemas[name] = ref
+	return &SchemaRef{Ref: "#/components/schemas/" + name}
+}
+
+func (s *genState) schemaToProperty(sc schema.Schema, scenario string) *SchemaRef {
+	if sc.Relations.Type != "" {
+		assocRef := s.buildSchemaRef(sc.Relations.Module, sc.Relations.Table, scenario)
+		switch sc.Relations.Type {
+		case "has_many", "many_to_many":
+			// Return empty array for nil associations
+			return &SchemaRef{Type: "array", Items: assocRef}
+		default:
+			return assocRef
+		}
+	}
+
+	prop := &SchemaRef{
+		Type:        mapSchemaType(sc.Type),
+		Format:      mapSchemaFormat(sc.Type),
+		Description: sc.Label,
+	}
+	if sc.PrimaryKey > 0 {
+		prop.ReadOnly = true
+	}
+	return prop
 }
 
 func mapSchemaType(t string) string {
