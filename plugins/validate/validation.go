@@ -72,7 +72,9 @@ func (validate *Validate) grantRules(scm schema.Schema, scenario string, rule sc
 		rules = append(rules, newRule("db_unique"))
 	}
 	if rule.Type != "" {
-		rules = append(rules, newRule(rule.Type))
+		if tag := validate.typeToValidatorTag(rule.Type); tag != "" {
+			rules = append(rules, newRule(tag))
+		}
 	}
 	if len(rule.Required) > 0 {
 		if slices.Contains(rule.Required, scenario) {
@@ -107,6 +109,23 @@ func (validate *Validate) findRule(name string, rules []*validateRule) *validate
 		}
 	}
 	return nil
+}
+
+// typeToValidatorTag 将 schema 定义的类型安全映射到 go-playground/validator 支持的 tag。
+// 对于 validator 不认识的 tag（如 integer、float、string）返回空字符串，避免运行时 panic。
+func (validate *Validate) typeToValidatorTag(typeName string) string {
+	switch typeName {
+	case schema.TypeInteger, schema.TypeFloat:
+		return "numeric"
+	case schema.TypeBoolean:
+		return "boolean"
+	case schema.TypeString:
+		// validator 没有 string tag；Go 的类型系统与 JSON 反序列化已保证类型安全。
+		return ""
+	default:
+		// 未知类型，安全忽略
+		return ""
+	}
 }
 
 func (validate *Validate) Initialize(db *gorm.DB) (err error) {

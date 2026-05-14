@@ -76,6 +76,10 @@ func formatError(rule schema.Rule, scm schema.Schema, tag string) string {
 		} else {
 			s = scm.Label + "值不能小于" + strconv.Itoa(rule.Min)
 		}
+	case "numeric":
+		s = scm.Label + "值必须是数字."
+	case "boolean":
+		s = scm.Label + "值必须是布尔值."
 	}
 	return s
 }
