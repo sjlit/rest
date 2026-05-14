@@ -366,6 +366,30 @@ func parseFieldPosition(field *schema.Field, i int) int {
 	return i + 100
 }
 
+func parseFieldRelations(field *schema.Field) Relation {
+	var rel Relation
+	tag := field.Tag.Get("relation")
+	if tag == "" {
+		return rel
+	}
+	parts := strings.Split(tag, ":")
+	if len(parts) >= 1 {
+		rel.Type = parts[0]
+	}
+	if len(parts) >= 2 {
+		rel.Name = parts[1]
+	} else {
+		rel.Name = field.Name
+	}
+	if len(parts) >= 3 {
+		rel.Module = parts[2]
+	}
+	if len(parts) >= 4 {
+		rel.Table = parts[3]
+	}
+	return rel
+}
+
 // GetSchemas 获取表字段
 func GetSchemas(ctx context.Context, db *gorm.DB, moduleName, tableName string) ([]Schema, error) {
 	var (
@@ -463,6 +487,7 @@ func AutoMigrate(ctx context.Context, db *gorm.DB, model any, moduleName string)
 			Scenarios:  parseFieldScenario(index, field),
 			Attributes: parseFieldAttributes(field),
 			Position:   parseFieldPosition(field, pos),
+			Relations:  parseFieldRelations(field),
 		}
 		//如果启用了在线调取接口功能，那么设置一下字段的format格式
 		if schemaModel.Attributes.Live.Enable {
