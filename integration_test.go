@@ -126,17 +126,24 @@ func TestIntegrationPreloadList(t *testing.T) {
 }
 
 type testRouter struct {
-	mux *http.ServeMux
+	handlers map[string]http.HandlerFunc
 }
 
 func (tr *testRouter) Handle(method, path string, handler http.HandlerFunc) {
-	tr.mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != method {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
+	if tr.handlers == nil {
+		tr.handlers = make(map[string]http.HandlerFunc)
+	}
+	key := method + " " + path
+	tr.handlers[key] = handler
+}
+
+func (tr *testRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	key := r.Method + " " + r.URL.Path
+	if handler, ok := tr.handlers[key]; ok {
 		handler(w, r)
-	})
+		return
+	}
+	http.NotFound(w, r)
 }
 
 func TestIntegrationOpenAPIEndpoint(t *testing.T) {
@@ -156,16 +163,16 @@ func TestIntegrationOpenAPIEndpoint(t *testing.T) {
 		t.Fatalf("NewModel failed: %v", err)
 	}
 
-	mux := http.NewServeMux()
+	tr := &testRouter{}
 	userResource := NewResource(userModel,
-		WithRouter[IntegUser](&testRouter{mux: mux}),
+		WithRouter[IntegUser](tr),
 		WithPrefix[IntegUser]("/api/v1"),
 	)
 	userResource.Register()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/integration/user/openapi.json", nil)
 	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, req)
+	tr.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
