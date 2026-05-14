@@ -1,9 +1,13 @@
 package openapi
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
 
 	"git.nobla.cn/golang/rest/schema"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestMapSchemaType(t *testing.T) {
@@ -115,5 +119,109 @@ func TestSchemaName(t *testing.T) {
 				t.Errorf("schemaName(%q, %q) = %q, want %q", tt.module, tt.table, got, tt.want)
 			}
 		})
+	}
+}
+
+type TestOrder struct {
+	ID     uint `json:"id" gorm:"primarykey"`
+	UserID uint `json:"user_id"`
+	Total  int  `json:"total"`
+}
+
+type TestUser struct {
+	ID     uint        `json:"id" gorm:"primarykey"`
+	Name   string      `json:"name" gorm:"size:100"`
+	Age    int         `json:"age"`
+	Orders []TestOrder `json:"orders" gorm:"foreignKey:UserID" relation:"has_many:Orders:openapi_test:test_orders"`
+}
+
+func TestGenerate(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&schema.Schema{}, &TestUser{}, &TestOrder{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	if _, err := schema.AutoMigrate(context.Background(), db, &TestUser{}, "openapi_test"); err != nil {
+		t.Fatalf("auto migrate schema: %v", err)
+	}
+	if _, err := schema.AutoMigrate(context.Background(), db, &TestOrder{}, "openapi_test"); err != nil {
+		t.Fatalf("auto migrate schema: %v", err)
+	}
+
+	g := NewGenerator()
+	cfg := Config{
+		Title:      "Test API",
+		Version:    "1.0.0",
+		ModuleName: "openapi_test",
+		TableName:  "test_users",
+		Singular:   "user",
+		Plural:     "users",
+		Prefix:     "/api/v1",
+		PrimaryKey: "id",
+		Scenarios: []string{
+			schema.ScenarioCreate,
+			schema.ScenarioUpdate,
+			schema.ScenarioDelete,
+			schema.ScenarioDetail,
+			schema.ScenarioSearch,
+			schema.ScenarioExport,
+		},
+		BuildUri: func(scenario string) (string, string) {
+			switch scenario {
+			case schema.ScenarioCreate:
+				return "POST", "/api/v1/openapi_test/user"
+			case schema.ScenarioUpdate:
+				return "PUT", "/api/v1/openapi_test/user/:id"
+			case schema.ScenarioDelete:
+				return "DELETE", "/api/v1/openapi_test/user/:id"
+			case schema.ScenarioDetail:
+				return "GET", "/api/v1/openapi_test/user/detail/:id"
+			case schema.ScenarioSearch:
+				return "GET", "/api/v1/openapi_test/users"
+			case schema.ScenarioExport:
+				return "GET", "/api/v1/openapi_test/user/export"
+			}
+			return "", ""
+		},
+	}
+
+	spec, err := g.Generate(context.Background(), db, cfg)
+	if err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+
+	// Verify paths exist
+	if len(spec.Paths) != 5 {
+		t.Fatalf("expected 5 paths, got %d", len(spec.Paths))
+	}
+	if spec.Paths["/api/v1/openapi_test/user/{id}"].Put == nil {
+		t.Fatal("expected PUT /user/{id}")
+	}
+	if spec.Paths["/api/v1/openapi_test/user/detail/{id}"].Get == nil {
+		t.Fatal("expected GET /user/detail/{id}")
+	}
+
+	// Verify components/schemas exist
+	if len(spec.Components.Schemas) == 0 {
+		t.Fatal("expected non-empty schemas")
+	}
+
+	baseName := schemaName("openapi_test", "test_users")
+	if _, ok := spec.Components.Schemas[baseName]; !ok {
+		t.Fatalf("expected schema %q in components", baseName)
+	}
+
+	// Verify association schema exists
+	assocName := schemaName("openapi_test", "test_orders")
+	if _, ok := spec.Components.Schemas[assocName]; !ok {
+		t.Fatalf("expected association schema %q in components", assocName)
+	}
+
+	// Verify JSON serialization works
+	_, err = json.Marshal(spec)
+	if err != nil {
+		t.Fatalf("json marshal failed: %v", err)
 	}
 }
