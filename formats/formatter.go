@@ -3,6 +3,7 @@ package formats
 import (
 	"context"
 	"reflect"
+	"strings"
 	"sync"
 
 	"git.nobla.cn/golang/rest/schema"
@@ -57,18 +58,35 @@ func (f *Formatter) Format(ctx context.Context, format string, value any, model 
 }
 
 func (f *Formatter) getModelValue(refValue reflect.Value, scm schema.Schema, stmt *gorm.Statement) any {
-	if stmt.Schema == nil {
-		return nil
+	if stmt.Schema != nil {
+		field := stmt.Schema.LookUpField(scm.Column)
+		if field != nil {
+			fieldVal := refValue.FieldByName(field.Name)
+			if fieldVal.IsValid() && fieldVal.CanInterface() {
+				return fieldVal.Interface()
+			}
+		}
 	}
-	field := stmt.Schema.LookUpField(scm.Column)
-	if field == nil {
-		return nil
+	// fallback for tests or when schema is not available
+	name := scm.Column
+	if scm.Relations.Name != "" {
+		name = scm.Relations.Name
 	}
-	fieldVal := refValue.FieldByName(field.Name)
-	if !fieldVal.IsValid() || !fieldVal.CanInterface() {
-		return nil
+	fieldVal := refValue.FieldByName(name)
+	if fieldVal.IsValid() && fieldVal.CanInterface() {
+		return fieldVal.Interface()
 	}
-	return fieldVal.Interface()
+	// case-insensitive fallback
+	typ := refValue.Type()
+	for i := range typ.NumField() {
+		if strings.EqualFold(typ.Field(i).Name, name) {
+			fieldVal = refValue.Field(i)
+			if fieldVal.IsValid() && fieldVal.CanInterface() {
+				return fieldVal.Interface()
+			}
+		}
+	}
+	return nil
 }
 
 func (f *Formatter) FormatModel(ctx context.Context, refValue reflect.Value, schemas []schema.Schema, stmt *gorm.Statement, format string) any {
@@ -77,6 +95,24 @@ func (f *Formatter) FormatModel(ctx context.Context, refValue reflect.Value, sch
 	modelValue := refValue.Interface()
 	indirectValue := reflect.Indirect(refValue)
 	for _, scm := range schemas {
+		if scm.Relations.Type != "" {
+			assocValue := f.getModelValue(indirectValue, scm, stmt)
+			if assocValue == nil {
+				if scm.Relations.Type == "has_many" || scm.Relations.Type == "many_to_many" {
+					values[scm.Column] = []any{}
+				} else {
+					values[scm.Column] = nil
+				}
+				continue
+			}
+			assocRef := reflect.ValueOf(assocValue)
+			if assocRef.Kind() == reflect.Slice {
+				values[scm.Column] = f.formatSlice(ctx, assocRef, format)
+			} else {
+				values[scm.Column] = f.formatSingle(ctx, assocRef, format)
+			}
+			continue
+		}
 		switch format {
 		case FormatRaw:
 			values[scm.Column] = f.getModelValue(indirectValue, scm, stmt)
@@ -92,6 +128,29 @@ func (f *Formatter) FormatModel(ctx context.Context, refValue reflect.Value, sch
 		return multiValues
 	}
 	return values
+}
+
+func (f *Formatter) formatSlice(ctx context.Context, refValue reflect.Value, format string) []any {
+	length := refValue.Len()
+	result := make([]any, 0, length)
+	for i := range length {
+		elem := refValue.Index(i)
+		if elem.Kind() == reflect.Ptr {
+			elem = reflect.Indirect(elem)
+		}
+		result = append(result, elem.Interface())
+	}
+	return result
+}
+
+func (f *Formatter) formatSingle(ctx context.Context, refValue reflect.Value, format string) any {
+	if refValue.Kind() == reflect.Ptr {
+		refValue = reflect.Indirect(refValue)
+	}
+	if !refValue.IsValid() {
+		return nil
+	}
+	return refValue.Interface()
 }
 
 func (f *Formatter) FormatModels(ctx context.Context, models any, schemas []schema.Schema, stmt *gorm.Statement, format string) any {
