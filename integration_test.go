@@ -205,3 +205,36 @@ func TestIntegrationOpenAPIEndpoint(t *testing.T) {
 		t.Error("expected non-empty schemas")
 	}
 }
+
+func TestIntegrationOpenAPIDisabledByDefault(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		if strings.Contains(err.Error(), "cgo") || strings.Contains(err.Error(), "stub") {
+			t.Skip("sqlite requires cgo")
+		}
+		t.Fatalf("failed to open db: %v", err)
+	}
+	if err := db.AutoMigrate(&schema.Schema{}, &IntegUser{}); err != nil {
+		t.Fatalf("failed to migrate: %v", err)
+	}
+
+	userModel, err := NewModel[IntegUser](WithDB(db), WithModuleName("integration"))
+	if err != nil {
+		t.Fatalf("NewModel failed: %v", err)
+	}
+
+	tr := &testRouter{}
+	userResource := NewResource(userModel,
+		WithRouter[IntegUser](tr),
+		WithPrefix[IntegUser]("/api/v1"),
+	)
+	userResource.Register()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/integration/user/openapi.json", nil)
+	rec := httptest.NewRecorder()
+	tr.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 when OpenAPI disabled, got %d", rec.Code)
+	}
+}
