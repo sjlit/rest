@@ -8,24 +8,40 @@ import (
 
 func TestMapSchemaType(t *testing.T) {
     tests := []struct {
-        input    string
-        wantType string
-        wantFmt  string
+        input string
+        want  string
     }{
-        {schema.TypeInteger, "integer", ""},
-        {schema.TypeFloat, "number", ""},
-        {schema.TypeBoolean, "boolean", ""},
-        {schema.TypeString, "string", ""},
-        {schema.FormatDate, "string", "date"},
-        {schema.FormatDatetime, "string", "date-time"},
-        {schema.FormatTimestamp, "string", "date-time"},
+        {schema.TypeInteger, "integer"},
+        {schema.TypeFloat, "number"},
+        {schema.TypeBoolean, "boolean"},
+        {schema.TypeString, "string"},
+        {schema.FormatDate, "string"},
+        {schema.FormatDatetime, "string"},
+        {schema.FormatTimestamp, "string"},
     }
     for _, tt := range tests {
-        if got := mapSchemaType(tt.input); got != tt.wantType {
-            t.Errorf("mapSchemaType(%q) = %q, want %q", tt.input, got, tt.wantType)
+        if got := mapSchemaType(tt.input); got != tt.want {
+            t.Errorf("mapSchemaType(%q) = %q, want %q", tt.input, got, tt.want)
         }
-        if got := mapSchemaFormat(tt.input); got != tt.wantFmt {
-            t.Errorf("mapSchemaFormat(%q) = %q, want %q", tt.input, got, tt.wantFmt)
+    }
+}
+
+func TestMapSchemaFormat(t *testing.T) {
+    tests := []struct {
+        input string
+        want  string
+    }{
+        {schema.TypeInteger, ""},
+        {schema.TypeFloat, ""},
+        {schema.TypeBoolean, ""},
+        {schema.TypeString, ""},
+        {schema.FormatDate, "date"},
+        {schema.FormatDatetime, "date-time"},
+        {schema.FormatTimestamp, "date-time"},
+    }
+    for _, tt := range tests {
+        if got := mapSchemaFormat(tt.input); got != tt.want {
+            t.Errorf("mapSchemaFormat(%q) = %q, want %q", tt.input, got, tt.want)
         }
     }
 }
