@@ -3,6 +3,7 @@ package openapi
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"git.nobla.cn/golang/rest/schema"
@@ -225,8 +226,12 @@ func (s *genState) buildIDParameter(primaryKey string, schemas []schema.Schema) 
 func (s *genState) buildRequestBody(refName, module, table, scenario string) *RequestBody {
 	ref := s.buildSchemaRef(module, table, scenario)
 	if ref.Ref == "" {
-		ref = &SchemaRef{Ref: "#/components/schemas/" + refName}
-		s.spec.Components.Schemas[refName] = ref
+		// Schema generation failed; fall back to inline object instead of self-reference
+		return &RequestBody{
+			Content: map[string]MediaType{
+				"application/json": {Schema: &SchemaRef{Type: "object"}},
+			},
+		}
 	}
 	return &RequestBody{
 		Content: map[string]MediaType{
@@ -257,6 +262,9 @@ func (s *genState) buildSchemaRef(module, table, scenario string) *SchemaRef {
 
 	schemas, err := schema.GetVisibleSchemas(s.ctx, s.db, module, table, scenario)
 	if err != nil || len(schemas) == 0 {
+		if err != nil {
+			log.Printf("[openapi] GetVisibleSchemas failed for %s.%s (scenario=%s): %v", module, table, scenario, err)
+		}
 		return &SchemaRef{Type: "object"}
 	}
 
@@ -268,6 +276,12 @@ func (s *genState) buildSchemaRef(module, table, scenario string) *SchemaRef {
 	for _, sc := range schemas {
 		prop := s.schemaToProperty(sc)
 		ref.Properties[sc.Column] = prop
+		for _, req := range sc.Rules.Required {
+			if req == scenario {
+				ref.Required = append(ref.Required, sc.Column)
+				break
+			}
+		}
 	}
 
 	s.spec.Components.Schemas[name] = ref
