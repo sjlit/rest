@@ -1,12 +1,10 @@
 package rest
 
 import (
-	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"path"
 	"reflect"
@@ -31,7 +29,6 @@ type (
 		formatter     *formats.Formatter
 		tenantResolve ResolveTenantFunc
 		userResolve   ResolveUserFunc
-		openAPISpec   []byte
 	}
 )
 
@@ -91,6 +88,9 @@ func (r *Resource[T]) buildUri(scenario string) (method string, uri string) {
 	case schema.ScenarioExport:
 		method = http.MethodGet
 		uri = path.Join(r.prefix, r.model.GetNaming().ModuleName, r.model.GetNaming().Singular, "export")
+	case "openapi":
+		method = http.MethodGet
+		uri = path.Join(r.prefix, r.model.GetNaming().ModuleName, r.model.GetNaming().Singular, "openapi.json")
 	}
 	return
 }
@@ -236,41 +236,8 @@ func (r *Resource[T]) Register() {
 		r.router.Handle(method, uri, r.Export)
 	}
 	if r.model.OpenAPIEnabled() {
-		spec, err := openapi.NewGenerator().Generate(
-			context.Background(),
-			r.model.GetDB(),
-			openapi.Config{
-				Title:      r.model.GetNaming().ModuleName + " API",
-				Version:    "1.0.0",
-				ModuleName: r.model.GetNaming().ModuleName,
-				TableName:  r.model.GetNaming().TableName,
-				Singular:   r.model.GetNaming().Singular,
-				Plural:     r.model.GetNaming().Pluralize,
-				Prefix:     r.prefix,
-				PrimaryKey: r.model.GetPrimaryKey(),
-				Scenarios: []string{
-					schema.ScenarioCreate,
-					schema.ScenarioUpdate,
-					schema.ScenarioDelete,
-					schema.ScenarioDetail,
-					schema.ScenarioSearch,
-					schema.ScenarioExport,
-				},
-				BuildUri: r.buildUri,
-			},
-		)
-		if err != nil {
-			log.Printf("[OpenAPI] failed to generate spec for %s: %v", r.model.GetNaming().ModuleName, err)
-		} else {
-			bytes, err := json.Marshal(spec)
-			if err != nil {
-				log.Printf("[OpenAPI] failed to marshal spec for %s: %v", r.model.GetNaming().ModuleName, err)
-			} else {
-				r.openAPISpec = bytes
-				openAPIPath := path.Join(r.prefix, r.model.GetNaming().ModuleName, r.model.GetNaming().Singular, "openapi.json")
-				r.router.Handle(http.MethodGet, openAPIPath, r.ServeOpenAPI)
-			}
-		}
+		method, uri = r.buildUri("openapi")
+		r.router.Handle(method, uri, r.OpenApi)
 	}
 }
 
@@ -286,15 +253,6 @@ func (r *Resource[T]) Respond(res http.ResponseWriter, req *http.Request, data a
 		return
 	}
 	json.NewEncoder(res).Encode(data)
-}
-
-func (r *Resource[T]) ServeOpenAPI(res http.ResponseWriter, req *http.Request) {
-	if len(r.openAPISpec) == 0 {
-		res.WriteHeader(http.StatusNotFound)
-		return
-	}
-	res.Header().Set("Content-Type", "application/json")
-	res.Write(r.openAPISpec)
 }
 
 func (r *Resource[T]) Create(res http.ResponseWriter, req *http.Request) {
@@ -537,6 +495,41 @@ func (r *Resource[T]) Export(res http.ResponseWriter, req *http.Request) {
 		}
 	}
 	writer.Flush()
+}
+
+func (r *Resource[T]) OpenApi(res http.ResponseWriter, req *http.Request) {
+	var (
+		err  error
+		spec *openapi.Spec
+	)
+	if spec, err = openapi.NewGenerator().Generate(
+		req.Context(),
+		r.model.GetDB(),
+		openapi.Config{
+			Title:      r.model.GetNaming().ModuleName + " API",
+			Version:    "1.0.0",
+			ModuleName: r.model.GetNaming().ModuleName,
+			TableName:  r.model.GetNaming().TableName,
+			Singular:   r.model.GetNaming().Singular,
+			Plural:     r.model.GetNaming().Pluralize,
+			Prefix:     r.prefix,
+			PrimaryKey: r.model.GetPrimaryKey(),
+			Scenarios: []string{
+				schema.ScenarioCreate,
+				schema.ScenarioUpdate,
+				schema.ScenarioDelete,
+				schema.ScenarioDetail,
+				schema.ScenarioSearch,
+				schema.ScenarioExport,
+			},
+			BuildUri: r.buildUri,
+		},
+	); err == nil {
+		res.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(res).Encode(spec)
+	} else {
+		r.Respond(res, req, err)
+	}
 }
 
 func NewResource[T any](model *Model[T], opts ...ResourceOption[T]) *Resource[T] {
