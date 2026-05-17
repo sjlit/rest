@@ -79,7 +79,7 @@
     >
       <SchemaForm
         v-bind="formProps"
-        :schemas="listSchemas"
+        :schemas="formSchemas"
         :scenario="formScenario"
         :model="formModel"
         :actions="formActionList"
@@ -98,7 +98,7 @@
     >
       <SchemaForm
         v-bind="formProps"
-        :schemas="listSchemas"
+        :schemas="formSchemas"
         :scenario="formScenario"
         :model="formModel"
         :actions="formActionList"
@@ -179,6 +179,9 @@ const searchSchemas = computed(() =>
 const listSchemas = computed(() =>
   props.schemas.filter((s) => s.scenarios?.includes('list') && !s.attributes.invisible)
 )
+const formSchemas = computed(() =>
+  props.schemas.filter((s) => s.scenarios?.includes(formScenario.value) && !s.attributes.invisible)
+)
 
 const formTitle = computed(() => {
   return formScenario.value === 'create' ? '创建' : '编辑'
@@ -256,8 +259,8 @@ function handleSelectionChange(selection: any[]) {
   emit('selectionChange', selection)
 }
 
-function handleSortChange(e: { prop: string; order: 'ascending' | 'descending' | null }) {
-  emit('sortChange', { column: e.prop, order: e.order })
+function handleSortChange(e: { column: string; order: 'ascending' | 'descending' | null }) {
+  emit('sortChange', e)
 }
 
 function handlePageChange(index: number) {

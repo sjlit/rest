@@ -206,6 +206,8 @@ async function init() {
   for (const key in props.presetQuery) {
     instance.addQueryParams(key, props.presetQuery[key])
   }
+  // TODO: presetQuery values should also be visible in SchemaPage's search form.
+  // SchemaPage currently does not expose a way to pre-populate searchModel.
 
   if (props.defaultSort) {
     if (props.defaultSort.startsWith('-')) {
@@ -228,13 +230,17 @@ async function init() {
   }
 }
 
-init()
+init().catch((err) => {
+  console.error('[SchemaViewer] init failed:', err)
+})
 
 watch(
   () => [props.module, props.table],
   () => {
     isReady.value = false
-    init()
+    init().catch((err) => {
+      console.error('[SchemaViewer] init failed:', err)
+    })
   }
 )
 
@@ -253,15 +259,9 @@ function handleCreate() {
   // SchemaPage handles dialog display
 }
 
-async function handleEdit(model: Model) {
-  const pk = crud.value!.findModelPrimaryKey(model)
-  const qs: Record<string, any> = { scenario: 'update', __format: 'raw' }
-  qs[crud.value!.primaryKey] = pk
-  try {
-    await crud.value!.getModel(qs)
-  } catch (e) {
-    console.error('Failed to fetch model for edit:', e)
-  }
+function handleEdit(model: Model) {
+  // SchemaPage handles dialog display with the row model
+  // Full model fetch would require exposing setFormModel on SchemaPage via template ref
 }
 
 function handleDelete(model: Model) {

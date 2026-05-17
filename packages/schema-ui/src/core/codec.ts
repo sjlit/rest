@@ -6,7 +6,14 @@ import type { Model, Schema } from './types'
 export function encode(model: Model, schemas: Schema[], scenario: string): Model {
   const result: Model = {}
   for (const key in model) {
-    result[key] = model[key]
+    const schema = schemas.find(s => s.column === key)
+    let value = model[key]
+    if (schema && value !== undefined && value !== null) {
+      if (['datetime', 'date', 'timestamp', 'time'].includes(schema.format) && value instanceof Date) {
+        value = value.toISOString()
+      }
+    }
+    result[key] = value
   }
   return result
 }
@@ -17,7 +24,18 @@ export function encode(model: Model, schemas: Schema[], scenario: string): Model
 export function decode(model: Model, schemas: Schema[], scenario: string): Model {
   const result: Model = {}
   for (const key in model) {
-    result[key] = model[key]
+    const schema = schemas.find(s => s.column === key)
+    let value = model[key]
+    if (schema && value !== undefined && value !== null) {
+      if (['integer'].includes(schema.type) && typeof value === 'string') {
+        value = parseInt(value, 10)
+      } else if (['float', 'double', 'decimal'].includes(schema.type) && typeof value === 'string') {
+        value = parseFloat(value)
+      } else if (schema.format === 'boolean' || schema.format === 'bool') {
+        value = !!value
+      }
+    }
+    result[key] = value
   }
   return result
 }

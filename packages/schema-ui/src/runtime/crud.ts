@@ -30,14 +30,13 @@ export class CRUD {
       module: options.module || '',
       table: options.table || '',
       apiPrefix: options.apiPrefix || 'rest',
-      schemas,
+      schemas: schemas.map(s => ({ ...s, rules: s.rules ? { ...s.rules } : { min: 0, max: 0, type: '', unique: false, required: [] } })),
       httpClient: options.httpClient,
     }
   }
 
   private __prepare() {
     for (const schema of this.schemas) {
-      schema.rules = schema.rules || { min: 0, max: 0, type: '', unique: false, required: [] }
       if (schema.primary_key === 1) {
         this.primaryKey = schema.column
         break
@@ -97,7 +96,8 @@ export class CRUD {
       : `/${this.opts.apiPrefix}/schema/${this.opts.table}`
 
     const res = await this.opts.httpClient.get(uri)
-    this.schemas = Array.isArray(res) ? res : res.data || []
+    const rawSchemas: Schema[] = Array.isArray(res) ? res : res.data || []
+    this.schemas = rawSchemas.map(s => ({ ...s, rules: s.rules ? { ...s.rules } : { min: 0, max: 0, type: '', unique: false, required: [] } }))
     this.__prepare()
     await this.__fetchVars()
     return this.schemas
@@ -141,17 +141,18 @@ export class CRUD {
     return this.models
   }
 
+  fieldErrors: Record<string, string> = {}
+
   setColumnError(column: string, error: string) {
-    const schema = this.schemas.find(s => s.column === column)
-    if (schema) {
-      ;(schema as any).__error = error
-    }
+    this.fieldErrors[column] = error
   }
 
   resetError() {
-    for (const schema of this.schemas) {
-      delete (schema as any).__error
-    }
+    this.fieldErrors = {}
+  }
+
+  getFieldErrors(): Record<string, string> {
+    return this.fieldErrors
   }
 
   setPaginationIndex(index: number): this {
@@ -306,7 +307,7 @@ export class CRUD {
     }
     const res = await this.getModel(qs)
     const pk = this.findModelPrimaryKey(res)
-    const index = this.models.findIndex(m => this.findModelPrimaryKey(m) == pk)
+    const index = this.models.findIndex(m => this.findModelPrimaryKey(m) === pk)
     if (index >= 0) {
       this.models[index] = res
     } else {

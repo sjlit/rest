@@ -69,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onUnmounted } from 'vue'
 import type { Schema, Model, Action as ActionType } from '../core/types'
 import Cell from './parts/Cell.vue'
 import Action from './parts/Action.vue'
@@ -83,6 +83,7 @@ interface Props {
   actions?: ActionType[]
   gridProps?: Record<string, any>
   responsive?: boolean
+  loading?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -91,6 +92,7 @@ const props = withDefaults(defineProps<Props>(), {
   actions: () => [],
   gridProps: () => ({}),
   responsive: true,
+  loading: false,
 })
 
 const emit = defineEmits<{
@@ -99,16 +101,23 @@ const emit = defineEmits<{
   dragend: []
 }>()
 
-const loading = ref(false)
 const isMobileView = ref(false)
 
+let mql: MediaQueryList | null = null
+let mediaListener: ((e: MediaQueryListEvent) => void) | null = null
+
 if (typeof window !== 'undefined') {
-  const mql = window.matchMedia('(max-width: 768px)')
+  mql = window.matchMedia('(max-width: 768px)')
   isMobileView.value = mql.matches
-  mql.addEventListener?.('change', (e) => {
-    isMobileView.value = e.matches
-  })
+  mediaListener = (e) => { isMobileView.value = e.matches }
+  mql.addEventListener?.('change', mediaListener)
 }
+
+onUnmounted(() => {
+  if (mql && mediaListener) {
+    mql.removeEventListener?.('change', mediaListener)
+  }
+})
 
 const enableMobileTable = computed(() => {
   if (!props.responsive) return false

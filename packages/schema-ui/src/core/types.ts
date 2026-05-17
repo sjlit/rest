@@ -49,7 +49,7 @@ export interface SchemaAttribute {
   invisible: boolean
   end_of_now: boolean
   time_search_range: string
-  values: EnumValue[]
+  values?: EnumValue[]
   live: LiveValue
   upload_url?: string
   icon?: string
