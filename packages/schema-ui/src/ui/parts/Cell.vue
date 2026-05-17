@@ -44,7 +44,8 @@ function formatValueByFormat(value: any, format: string): string {
         if (match) return match[1]
       }
       if (typeof value === 'number') {
-        const d = new Date(value * 1000)
+        const ts = value < 1e12 ? value * 1000 : value
+        const d = new Date(ts)
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       }
       return String(value)
@@ -55,7 +56,8 @@ function formatValueByFormat(value: any, format: string): string {
         if (match) return match[1]
       }
       if (typeof value === 'number') {
-        const d = new Date(value * 1000)
+        const ts = value < 1e12 ? value * 1000 : value
+        const d = new Date(ts)
         return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
       }
       return String(value)
@@ -67,7 +69,8 @@ function formatValueByFormat(value: any, format: string): string {
         if (match) return `${match[1]} ${match[2]}`
       }
       if (typeof value === 'number') {
-        const d = new Date(value * 1000)
+        const ts = value < 1e12 ? value * 1000 : value
+        const d = new Date(ts)
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
       }
       return String(value)

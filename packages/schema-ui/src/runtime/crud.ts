@@ -272,7 +272,12 @@ export class CRUD {
     // Convert date range arrays to comma-separated strings for backend compatibility
     for (const key in queryParams) {
       const value = queryParams[key]
-      if (Array.isArray(value) && value.length === 2) {
+      if (
+        Array.isArray(value) &&
+        value.length === 2 &&
+        value[0] !== '' && value[0] !== null && value[0] !== undefined &&
+        value[1] !== '' && value[1] !== null && value[1] !== undefined
+      ) {
         const scm = this.schemas.find(s => s.column === key)
         if (scm && ['datetime', 'date', 'timestamp', 'time'].includes(scm.format)) {
           queryParams[key] = `${value[0]},${value[1]}`

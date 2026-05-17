@@ -112,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { More } from '@element-plus/icons-vue'
 import type { Schema, Model, Action as ActionType, Pagination as PaginationType } from '../core/types'
 import SchemaForm from './SchemaForm.vue'
@@ -174,6 +174,10 @@ const formScenario = ref('create')
 const searchModel = ref<Model>({ ...props.presetQuery })
 const formModel = ref<Model>({})
 const selections = ref<any[]>([])
+
+watch(() => props.presetQuery, (val) => {
+  searchModel.value = { ...val }
+}, { deep: true })
 
 const searchSchemas = computed(() =>
   props.schemas.filter((s) => s.enable !== 0 && s.scenarios?.includes('search'))

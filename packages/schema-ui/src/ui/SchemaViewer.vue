@@ -266,7 +266,6 @@ function handleCreate() {
 
 async function handleEdit(model: Model) {
   try {
-    searching.value = true
     const pk = crud.value!.findModelPrimaryKey(model)
     if (pk !== undefined && pk !== null && pk !== '') {
       const detail = await crud.value!.getModel(String(pk))
@@ -277,8 +276,6 @@ async function handleEdit(model: Model) {
   } catch (e) {
     console.error('Failed to fetch detail:', e)
     schemaPageRef.value?.openEdit(model)
-  } finally {
-    searching.value = false
   }
 }
 

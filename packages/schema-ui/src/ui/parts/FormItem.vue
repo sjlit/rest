@@ -5,8 +5,7 @@
       start="00:00"
       step="00:15"
       end="23:59"
-      :disabled="isDisabled"
-      :readonly="isReadonly"
+      :disabled="isDisabled || isReadonly"
       :placeholder="placeholder"
       format="HH:mm"
     />
@@ -16,8 +15,7 @@
       v-if="isRange"
       v-model="model[schema.column]"
       type="daterange"
-      :disabled="isDisabled"
-      :readonly="isReadonly"
+      :disabled="isDisabled || isReadonly"
       :editable="false"
       format="YYYY-MM-DD"
       value-format="YYYY-MM-DD"
@@ -29,8 +27,7 @@
       v-else
       v-model="model[schema.column]"
       type="date"
-      :disabled="isDisabled"
-      :readonly="isReadonly"
+      :disabled="isDisabled || isReadonly"
       :editable="false"
       format="YYYY-MM-DD"
       value-format="YYYY-MM-DD"
@@ -43,8 +40,7 @@
       v-if="isRange"
       v-model="model[schema.column]"
       type="datetimerange"
-      :disabled="isDisabled"
-      :readonly="isReadonly"
+      :disabled="isDisabled || isReadonly"
       :editable="false"
       format="YYYY-MM-DD HH:mm:ss"
       value-format="YYYY-MM-DD HH:mm:ss"
@@ -56,8 +52,7 @@
       v-else
       v-model="model[schema.column]"
       type="datetime"
-      :disabled="isDisabled"
-      :readonly="isReadonly"
+      :disabled="isDisabled || isReadonly"
       :editable="false"
       format="YYYY-MM-DD HH:mm:ss"
       value-format="YYYY-MM-DD HH:mm:ss"
@@ -234,7 +229,9 @@ const endPlaceholder = computed(() => `结束${props.schema.label}`)
 
 function disabledDate(time: Date) {
   if (!props.schema.attributes.end_of_now) return false
-  return time.getTime() > Date.now()
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return time.getTime() > today.getTime()
 }
 
 function isVisible(type: string): boolean {
@@ -265,7 +262,7 @@ function isVisible(type: string): boolean {
     case 'multistr':
       return scenario.value !== 'search' && fmt === 'text'
     default:
-      return ['string', 'text'].includes(fmt)
+      return fmt === 'string'
   }
 }
 </script>
