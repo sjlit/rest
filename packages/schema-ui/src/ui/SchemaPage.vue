@@ -137,6 +137,7 @@ interface Props {
   formActions?: ActionType[]
   gridProps?: Record<string, any>
   formProps?: Record<string, any>
+  presetQuery?: Record<string, any>
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -154,6 +155,7 @@ const props = withDefaults(defineProps<Props>(), {
   formActions: () => [],
   gridProps: () => ({}),
   formProps: () => ({}),
+  presetQuery: () => ({}),
 })
 
 const emit = defineEmits<{
@@ -169,18 +171,18 @@ const emit = defineEmits<{
 
 const formVisible = ref(false)
 const formScenario = ref('create')
-const searchModel = ref<Model>({})
+const searchModel = ref<Model>({ ...props.presetQuery })
 const formModel = ref<Model>({})
 const selections = ref<any[]>([])
 
 const searchSchemas = computed(() =>
-  props.schemas.filter((s) => s.scenarios?.includes('search'))
+  props.schemas.filter((s) => s.enable !== 0 && s.scenarios?.includes('search'))
 )
 const listSchemas = computed(() =>
-  props.schemas.filter((s) => s.scenarios?.includes('list') && !s.attributes.invisible)
+  props.schemas.filter((s) => s.enable !== 0 && s.scenarios?.includes('list') && !s.attributes.invisible)
 )
 const formSchemas = computed(() =>
-  props.schemas.filter((s) => s.scenarios?.includes(formScenario.value) && !s.attributes.invisible)
+  props.schemas.filter((s) => s.enable !== 0 && s.scenarios?.includes(formScenario.value) && !s.attributes.invisible)
 )
 
 const formTitle = computed(() => {

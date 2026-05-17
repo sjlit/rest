@@ -65,16 +65,18 @@ export class CRUD {
       case 'create':
         parts.push(singularName)
         break
+      case 'get':
+        parts.push(singularName, 'detail', pk)
+        break
       case 'update':
       case 'delete':
-      case 'get':
         parts.push(singularName, pk)
         break
       case 'search':
         parts.push(pluralName)
         break
       case 'export':
-        parts.push(`${singularName}-export`)
+        parts.push(singularName, 'export')
         break
       case 'import':
         parts.push(`${singularName}-import`)
@@ -258,7 +260,7 @@ export class CRUD {
   async searchModel(): Promise<Model[]> {
     const queryParams: Record<string, any> = { ...this.queryParams }
     queryParams.page = this.pagination.index
-    queryParams.pagesize = this.pagination.size || 15
+    queryParams.page_size = this.pagination.size || 15
     if (this.sortable?.column) {
       queryParams.sort = this.sortable.order === 'descending' ? `-${this.sortable.column}` : this.sortable.column
     }
@@ -267,9 +269,20 @@ export class CRUD {
       queryParams[k] = this.fixedQuery[k]
     }
 
+    // Convert date range arrays to comma-separated strings for backend compatibility
+    for (const key in queryParams) {
+      const value = queryParams[key]
+      if (Array.isArray(value) && value.length === 2) {
+        const scm = this.schemas.find(s => s.column === key)
+        if (scm && ['datetime', 'date', 'timestamp', 'time'].includes(scm.format)) {
+          queryParams[key] = `${value[0]},${value[1]}`
+        }
+      }
+    }
+
     const res = await this.opts.httpClient.get(this.__buildUri('search'), { params: queryParams })
-    this.pagination.index = parseInt(res.page) || 1
-    this.pagination.size = parseInt(res.pagesize) || 15
+    this.pagination.index = (parseInt(res.page) || 0) + 1
+    this.pagination.size = parseInt(res.page_size) || 15
     this.pagination.totalCount = parseInt(res.totalCount) || 0
     this.models = res.data || []
     return this.models

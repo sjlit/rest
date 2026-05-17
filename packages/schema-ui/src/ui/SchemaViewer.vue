@@ -18,6 +18,7 @@
     :formActions="formActionList"
     :gridProps="gridProps"
     :formProps="formProps"
+    :presetQuery="presetQuery"
     @search="handleSearch"
     @create="handleCreate"
     @edit="handleEdit"

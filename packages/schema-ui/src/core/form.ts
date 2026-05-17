@@ -23,10 +23,26 @@ export function generateSchemaRule(
     })
   }
 
+  if (rule.min > 0 && schema.type === 'string') {
+    rules.push({
+      min: rule.min,
+      message: t('validation.min', [schema.label, rule.min]),
+      trigger: 'blur',
+    })
+  }
+
   if (rule.max > 0 && schema.type === 'string') {
     rules.push({
       max: rule.max,
       message: t('validation.max', [schema.label, rule.max]),
+      trigger: 'blur',
+    })
+  }
+
+  if (rule.type) {
+    rules.push({
+      type: rule.type,
+      message: t('validation.type', [schema.label]),
       trigger: 'blur',
     })
   }

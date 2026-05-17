@@ -6,6 +6,7 @@
       step="00:15"
       end="23:59"
       :disabled="isDisabled"
+      :readonly="isReadonly"
       :placeholder="placeholder"
       format="HH:mm"
     />
@@ -16,21 +17,25 @@
       v-model="model[schema.column]"
       type="daterange"
       :disabled="isDisabled"
+      :readonly="isReadonly"
       :editable="false"
       format="YYYY-MM-DD"
       value-format="YYYY-MM-DD"
       :start-placeholder="startPlaceholder"
       :end-placeholder="endPlaceholder"
+      :disabled-date="disabledDate"
     />
     <el-date-picker
       v-else
       v-model="model[schema.column]"
       type="date"
       :disabled="isDisabled"
+      :readonly="isReadonly"
       :editable="false"
       format="YYYY-MM-DD"
       value-format="YYYY-MM-DD"
       :placeholder="placeholder"
+      :disabled-date="disabledDate"
     />
   </template>
   <template v-else-if="isVisible('datetime')">
@@ -39,28 +44,32 @@
       v-model="model[schema.column]"
       type="datetimerange"
       :disabled="isDisabled"
+      :readonly="isReadonly"
       :editable="false"
       format="YYYY-MM-DD HH:mm:ss"
       value-format="YYYY-MM-DD HH:mm:ss"
       :start-placeholder="startPlaceholder"
       :end-placeholder="endPlaceholder"
+      :disabled-date="disabledDate"
     />
     <el-date-picker
       v-else
       v-model="model[schema.column]"
       type="datetime"
       :disabled="isDisabled"
+      :readonly="isReadonly"
       :editable="false"
       format="YYYY-MM-DD HH:mm:ss"
       value-format="YYYY-MM-DD HH:mm:ss"
       :placeholder="placeholder"
+      :disabled-date="disabledDate"
     />
   </template>
   <template v-else-if="isVisible('dropdown')">
     <el-select
       v-model="model[schema.column]"
       :multiple="isMultiSelect"
-      :disabled="isDisabled"
+      :disabled="isDisabled || isReadonly"
       :placeholder="placeholder"
       :allow-create="schema.attributes.dropdown?.created"
       :filterable="schema.attributes.dropdown?.filterable"
@@ -85,7 +94,7 @@
     <el-cascader
       v-model="model[schema.column]"
       :options="schema.attributes.values"
-      :disabled="isDisabled"
+      :disabled="isDisabled || isReadonly"
       filterable
       clearable
       :placeholder="placeholder"
@@ -93,12 +102,12 @@
     />
   </template>
   <template v-else-if="isVisible('boolean')">
-    <el-switch v-model="model[schema.column]" :disabled="isDisabled" />
+    <el-switch v-model="model[schema.column]" :disabled="isDisabled || isReadonly" />
   </template>
   <template v-else-if="isVisible('file')">
     <el-upload
       :action="schema.attributes.upload_url"
-      :disabled="isDisabled"
+      :disabled="isDisabled || isReadonly"
       :file-list="fileList"
       @success="handleUploadSuccess"
     >
@@ -109,6 +118,7 @@
     <el-input
       v-model="model[schema.column]"
       :disabled="isDisabled"
+      :readonly="isReadonly"
       show-password
       :placeholder="placeholder"
     />
@@ -118,6 +128,7 @@
       v-model="model[schema.column]"
       type="textarea"
       :disabled="isDisabled"
+      :readonly="isReadonly"
       :placeholder="placeholder"
       :maxlength="schema.rules.max > 0 ? schema.rules.max : undefined"
     />
@@ -126,6 +137,7 @@
     <el-input
       v-model.number="model[schema.column]"
       :disabled="isDisabled"
+      :readonly="isReadonly"
       :prefix-icon="schema.attributes.icon || ''"
       :placeholder="placeholder"
       :clearable="scenario === 'search'"
@@ -139,6 +151,7 @@
     <el-input
       v-model="model[schema.column]"
       :disabled="isDisabled"
+      :readonly="isReadonly"
       :prefix-icon="schema.attributes.icon || ''"
       :placeholder="placeholder"
       :clearable="scenario === 'search'"
@@ -167,15 +180,19 @@ const isSearch = computed(() => scenario.value === 'search')
 const isRange = computed(() => scenario.value === 'search')
 
 const isDisabled = computed(() => {
+  return props.schema.attributes.disable.includes(scenario.value)
+})
+
+const isReadonly = computed(() => {
   return (
-    props.schema.attributes.disable.includes(scenario.value) ||
+    !isDisabled.value &&
     props.schema.attributes.readonly.includes(scenario.value)
   )
 })
 
 const isMultiSelect = computed(() => {
   if (props.schema.format === 'multiSelect') return true
-  if (isSearch.value && props.schema.attributes.dropdown?.multiple) return true
+  if (props.schema.attributes.dropdown?.multiple) return true
   return false
 })
 
@@ -196,13 +213,18 @@ const placeholder = computed(() => {
 const startPlaceholder = computed(() => `开始${props.schema.label}`)
 const endPlaceholder = computed(() => `结束${props.schema.label}`)
 
+function disabledDate(time: Date) {
+  if (!props.schema.attributes.end_of_now) return false
+  return time.getTime() > Date.now()
+}
+
 function isVisible(type: string): boolean {
   const fmt = props.schema.format
   const tp = props.schema.type
 
   switch (type) {
     case 'number':
-      return ['integer', 'decimal'].includes(fmt) || ['integer', 'double'].includes(tp)
+      return ['integer', 'float', 'decimal'].includes(fmt) || ['integer', 'float', 'double'].includes(tp)
     case 'password':
       return ['password', 'pass'].includes(fmt)
     case 'time':
@@ -222,7 +244,7 @@ function isVisible(type: string): boolean {
     case 'file':
       return fmt === 'file' && !!props.schema.attributes.upload_url
     case 'multistr':
-      return scenario.value !== 'search' && fmt === 'textarea'
+      return scenario.value !== 'search' && fmt === 'text'
     default:
       return ['string', 'text'].includes(fmt)
   }

@@ -10,7 +10,20 @@ export function encode(model: Model, schemas: Schema[], scenario: string): Model
     let value = model[key]
     if (schema && value !== undefined && value !== null) {
       if (['datetime', 'date', 'timestamp', 'time'].includes(schema.format) && value instanceof Date) {
-        value = value.toISOString()
+        const pad = (n: number) => String(n).padStart(2, '0')
+        const y = value.getFullYear()
+        const m = pad(value.getMonth() + 1)
+        const d = pad(value.getDate())
+        const h = pad(value.getHours())
+        const min = pad(value.getMinutes())
+        const s = pad(value.getSeconds())
+        if (schema.format === 'date') {
+          value = `${y}-${m}-${d}`
+        } else if (schema.format === 'time') {
+          value = `${h}:${min}:${s}`
+        } else {
+          value = `${y}-${m}-${d} ${h}:${min}:${s}`
+        }
       }
     }
     result[key] = value

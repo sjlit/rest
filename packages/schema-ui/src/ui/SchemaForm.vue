@@ -103,6 +103,7 @@ const COL_SPANS = { FULL: 24, HALF: 12, THIRD: 8 }
 
 const displayColumns = computed(() => {
   return props.schemas.filter(schema => {
+    if (schema.enable === 0) return false
     if (schema.attributes.invisible) return false
     if (!Array.isArray(schema.scenarios)) return false
     if (!schema.scenarios.includes(props.scenario)) return false
@@ -132,8 +133,10 @@ const formRules = computed(() => {
   const t = globalConfig?.i18n?.t || ((key: string, args?: any[]) => {
     const messages: Record<string, string> = {
       'validation.required': args ? `${args[0]}不能为空` : '必填项',
+      'validation.min': args ? `${args[0]}不能少于${args[1]}个字符` : '低于最小长度',
       'validation.max': args ? `${args[0]}不能超过${args[1]}个字符` : '超出最大长度',
       'validation.pattern': args ? `${args[0]}格式不正确` : '格式不正确',
+      'validation.type': args ? `${args[0]}格式类型不正确` : '格式类型不正确',
     }
     return messages[key] || key
   })
@@ -151,8 +154,20 @@ function getColSpan(schema: Schema): number {
   return COL_SPANS.THIRD
 }
 
+function applyDefaults(model: Model) {
+  for (const schema of props.schemas) {
+    const defaultValue = schema.attributes.default_value
+    if (defaultValue !== undefined && defaultValue !== null && defaultValue !== '') {
+      if (model[schema.column] === undefined || model[schema.column] === null || model[schema.column] === '') {
+        model[schema.column] = defaultValue
+      }
+    }
+  }
+}
+
 onMounted(() => {
   activeModel.value = decode(props.model || {}, props.schemas, props.scenario)
+  applyDefaults(activeModel.value)
   if (props.autoSubmit) {
     nextTick(() => submit())
   }
@@ -165,6 +180,7 @@ onMounted(() => {
       () => props.model,
       (val) => {
         activeModel.value = decode(val || {}, props.schemas, props.scenario)
+        applyDefaults(activeModel.value)
       },
       { deep: true }
     )

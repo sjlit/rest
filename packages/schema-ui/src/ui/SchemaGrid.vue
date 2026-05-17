@@ -126,6 +126,7 @@ const enableMobileTable = computed(() => {
 
 const visibleSchemas = computed(() => {
   return props.schemas.filter((v) => {
+    if (v.enable === 0) return false
     if (!Array.isArray(v.scenarios)) return false
     if (!v.scenarios.includes(props.scenario)) return false
     return !v.attributes.invisible
