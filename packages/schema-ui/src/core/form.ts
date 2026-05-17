@@ -1,4 +1,4 @@
-import type { Schema } from './types'
+import type { Schema, Scenario } from './types'
 
 export interface FieldRules {
   [key: string]: any
@@ -10,7 +10,7 @@ export interface FieldRules {
 export function generateSchemaRule(
   t: (key: string, ...args: any[]) => string,
   schema: Schema,
-  scenario: string
+  scenario: Scenario
 ): any[] {
   const rules: any[] = []
   const rule = schema.rules
@@ -84,7 +84,7 @@ export function checkSchemaVisible(schema: Schema, model: Record<string, any>): 
 export function generateSchemaDescription(
   _t: (key: string, ...args: any[]) => string,
   schema: Schema,
-  _scenario: string
+  _scenario: Scenario
 ): string {
   if (schema.attributes.tooltip) {
     return schema.attributes.tooltip
@@ -107,4 +107,25 @@ export function clearSearchModel(
     }
   }
   return result
+}
+
+/**
+ * 按场景过滤可见的 schema 列表
+ */
+export function filterByScenario(
+  schemas: Schema[],
+  scenario: Scenario,
+  options?: {
+    includeInvisible?: boolean
+    visibleCheck?: (schema: Schema) => boolean
+  }
+): Schema[] {
+  return schemas.filter((schema) => {
+    if (schema.enable === 0) return false
+    if (!Array.isArray(schema.scenarios)) return false
+    if (!schema.scenarios.includes(scenario)) return false
+    if (!options?.includeInvisible && schema.attributes.invisible) return false
+    if (options?.visibleCheck && !options.visibleCheck(schema)) return false
+    return true
+  })
 }

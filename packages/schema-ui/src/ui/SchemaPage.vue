@@ -9,20 +9,15 @@
       <div class="header-right">
         <slot name="headerright">
           <el-button v-if="!readonly" type="primary" round @click="handleCreate">
-            创建
+            {{ t('action.create') }}
           </el-button>
         </slot>
       </div>
     </div>
     <div class="schema-page-body">
       <div v-if="showSearch" class="schema-page-search">
-        <SchemaForm
-          :schemas="searchSchemas"
-          scenario="search"
-          :model="searchModel"
-          :inline="true"
-          :actions="searchActionList"
-        >
+        <SchemaForm :schemas="searchSchemas" scenario="search" :model="searchModel" :inline="true"
+          :actions="searchActionList">
           <template #default="{ model, schema }">
             <slot name="searchform" :model="model" :schema="schema" />
           </template>
@@ -30,14 +25,12 @@
       </div>
       <div v-if="showToolbar" class="schema-page-toolbar">
         <el-dropdown v-if="batchActionList.length > 0" placement="bottom-end">
-          <el-icon><More /></el-icon>
+          <el-icon>
+            <More />
+          </el-icon>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item
-                v-for="action in batchActionList"
-                :key="action.name"
-                @click="handleBatchAction(action)"
-              >
+              <el-dropdown-item v-for="action in batchActionList" :key="action.name" @click="handleBatchAction(action)">
                 {{ action.label }}
               </el-dropdown-item>
             </el-dropdown-menu>
@@ -45,64 +38,29 @@
         </el-dropdown>
       </div>
       <div class="schema-page-grid" v-loading="loading">
-        <SchemaGrid
-          :schemas="listSchemas"
-          :models="models"
-          scenario="list"
-          :actions="rowActionList"
-          v-bind="gridProps"
-          @selection="handleSelectionChange"
-          @sort="handleSortChange"
-        >
+        <SchemaGrid :schemas="listSchemas" :models="models" scenario="list" :actions="rowActionList" v-bind="gridProps"
+          @selection="handleSelectionChange" @sort="handleSortChange">
           <template #default="{ model, schema }">
             <slot name="gridview" :model="model" :schema="schema" />
           </template>
         </SchemaGrid>
-        <el-pagination
-          v-if="showPagination"
-          :page-size="pagination.size"
-          :total="pagination.totalCount"
-          :current-page="pagination.index"
-          layout="total, prev, pager, next"
-          @current-change="handlePageChange"
-        />
+        <el-pagination v-if="showPagination" :page-size="pagination.size" :total="pagination.totalCount"
+          :current-page="pagination.index" layout="total, prev, pager, next" @current-change="handlePageChange" />
       </div>
     </div>
 
-    <el-dialog
-      v-if="formMode === 'dialog'"
-      v-model="formVisible"
-      :title="formTitle"
-      :width="formWidth"
-      draggable
-      destroy-on-close
-    >
-      <SchemaForm
-        v-bind="formProps"
-        :schemas="formSchemas"
-        :scenario="formScenario"
-        :model="formModel"
-        :actions="formActionList"
-      >
+    <el-dialog v-if="formMode === 'dialog'" v-model="formVisible" :title="formTitle" :width="formWidth" draggable
+      destroy-on-close>
+      <SchemaForm v-bind="formProps" :schemas="formSchemas" :scenario="formScenario" :model="formModel"
+        :actions="formActionList">
         <template #default="{ model, schema }">
           <slot name="crudform" :model="model" :schema="schema" />
         </template>
       </SchemaForm>
     </el-dialog>
-    <el-drawer
-      v-else
-      v-model="formVisible"
-      :title="formTitle"
-      :size="formWidth"
-      destroy-on-close
-    >
-      <SchemaForm
-        v-bind="formProps"
-        :schemas="formSchemas"
-        :scenario="formScenario"
-        :model="formModel"
-        :actions="formActionList"
-      >
+    <el-drawer v-else v-model="formVisible" :title="formTitle" :size="formWidth" destroy-on-close>
+      <SchemaForm v-bind="formProps" :schemas="formSchemas" :scenario="formScenario" :model="formModel"
+        :actions="formActionList">
         <template #default="{ model, schema }">
           <slot name="crudform" :model="model" :schema="schema" />
         </template>
@@ -112,9 +70,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, inject } from 'vue'
 import { More } from '@element-plus/icons-vue'
-import type { Schema, Model, Action as ActionType, Pagination as PaginationType } from '../core/types'
+import type { Schema, Model, Action as ActionType, Pagination as PaginationType, Scenario } from '../core/types'
+import type { SchemaUIConfig } from '../config'
+import { filterByScenario } from '../core/form'
+import { createDefaultTranslator } from '../core/i18n'
+import { GLOBAL_CONFIG_KEY } from '../config'
 import SchemaForm from './SchemaForm.vue'
 import SchemaGrid from './SchemaGrid.vue'
 
@@ -166,11 +128,18 @@ const emit = defineEmits<{
   pageChange: [index: number]
   sortChange: [sortable: { column: string; order: 'ascending' | 'descending' | null }]
   selectionChange: [selection: any[]]
-  formSubmit: [model: Model, scenario: string]
+  formSubmit: [model: Model, scenario: Scenario]
 }>()
 
+const globalConfig = inject<SchemaUIConfig | null>(GLOBAL_CONFIG_KEY, null)
+
+const t = (key: string, ...args: any[]) => {
+  const fn = globalConfig?.i18n?.t || createDefaultTranslator()
+  return fn(key, ...args)
+}
+
 const formVisible = ref(false)
-const formScenario = ref('create')
+const formScenario = ref<Scenario>('create')
 const searchModel = ref<Model>({ ...props.presetQuery })
 const formModel = ref<Model>({})
 const selections = ref<any[]>([])
@@ -180,17 +149,17 @@ watch(() => props.presetQuery, (val) => {
 }, { deep: true })
 
 const searchSchemas = computed(() =>
-  props.schemas.filter((s) => s.enable !== 0 && s.scenarios?.includes('search'))
+  filterByScenario(props.schemas, 'search', { includeInvisible: true })
 )
 const listSchemas = computed(() =>
-  props.schemas.filter((s) => s.enable !== 0 && s.scenarios?.includes('list') && !s.attributes.invisible)
+  filterByScenario(props.schemas, 'list')
 )
 const formSchemas = computed(() =>
-  props.schemas.filter((s) => s.enable !== 0 && s.scenarios?.includes(formScenario.value) && !s.attributes.invisible)
+  filterByScenario(props.schemas, formScenario.value)
 )
 
 const formTitle = computed(() => {
-  return formScenario.value === 'create' ? '创建' : '编辑'
+  return formScenario.value === 'create' ? t('form.create') : t('form.edit')
 })
 
 const formWidth = computed(() => {
@@ -207,7 +176,7 @@ const searchActionList = computed((): ActionType[] => {
   return [
     {
       name: 'search',
-      label: '搜索',
+      label: t('action.search'),
       type: 'primary',
       asyncCallback: async (model) => {
         emit('search', model)
@@ -220,8 +189,8 @@ const rowActionList = computed((): ActionType[] => {
   if (props.readonly) return []
   if (props.rowActions.length > 0) return props.rowActions
   return [
-    { name: 'edit', label: '编辑', type: 'success', callback: (model) => handleEdit(model) },
-    { name: 'delete', label: '删除', type: 'danger', callback: (model) => emit('delete', model) },
+    { name: 'edit', label: t('action.edit'), type: 'success', callback: (model) => handleEdit(model) },
+    { name: 'delete', label: t('action.delete'), type: 'danger', callback: (model) => emit('delete', model) },
   ]
 })
 
@@ -231,7 +200,7 @@ const formActionList = computed((): ActionType[] => {
   return [
     {
       name: 'save',
-      label: '保存',
+      label: t('action.save'),
       type: 'primary',
       asyncCallback: async (model) => {
         emit('formSubmit', model, formScenario.value)

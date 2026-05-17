@@ -1,6 +1,8 @@
 import pluralize from 'pluralize'
-import type { Schema, Model, CRUDOptions, Pagination, Sortable } from '../core/types'
+import type { Schema, Model, CRUDOptions, Pagination, Sortable, Scenario } from '../core/types'
 import type { SchemaUIConfig } from '../config'
+
+type UriScenario = Scenario | 'get'
 
 const DEFAULT_PAGINATION: Pagination = {
   index: 1,
@@ -44,11 +46,11 @@ export class CRUD {
     }
   }
 
-  private __buildUri(scenario: string, primaryKey?: string): string {
+  private __buildUri(scenario: UriScenario, primaryKey?: string): string {
     return this.__buildModelUri(this.opts.module, this.opts.table, scenario, primaryKey)
   }
 
-  private __buildModelUri(moduleName: string, tableName: string, scenario: string, primaryKey?: string): string {
+  private __buildModelUri(moduleName: string, tableName: string, scenario: UriScenario, primaryKey?: string): string {
     const pk = primaryKey || ''
     const pluralName = pluralize.plural(tableName)
     const singularName = pluralize.singular(tableName)

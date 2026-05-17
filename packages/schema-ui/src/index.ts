@@ -58,7 +58,7 @@ export {
 export { Scenarios } from './core/scenarios'
 export { encode, decode } from './core/codec'
 export { getModelValue, getModelLabel } from './core/model'
-export { generateSchemaRule, checkSchemaVisible, clearSearchModel } from './core/form'
+export { generateSchemaRule, checkSchemaVisible, clearSearchModel, filterByScenario } from './core/form'
 export { createDefaultTranslator } from './core/i18n'
 
 // === UI Components ===

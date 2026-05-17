@@ -81,8 +81,8 @@
   </template>
   <template v-else-if="componentType === 'search_boolean'">
     <el-select v-model="columnValue" clearable>
-      <el-option label="是" :value="true" />
-      <el-option label="否" :value="false" />
+      <el-option :label="t('boolean.true')" :value="true" />
+      <el-option :label="t('boolean.false')" :value="false" />
     </el-select>
   </template>
   <template v-else-if="componentType === 'cascader'">
@@ -161,15 +161,17 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { Schema } from '../../core/types'
+import type { Schema, Scenario } from '../../core/types'
+import { createDefaultTranslator } from '../../core/i18n'
 
 interface Props {
   modelValue: any
   schema: Schema
-  scenario?: string
+  scenario?: Scenario
 }
 
 const props = defineProps<Props>()
+const t = createDefaultTranslator()
 
 const emit = defineEmits<{
   'update:modelValue': [value: any]
@@ -229,13 +231,13 @@ function handleUploadRemove() {
 const placeholder = computed(() => {
   if (props.schema.attributes.tooltip) return props.schema.attributes.tooltip
   if (props.schema.format === 'dropdown') {
-    return `请选择${props.schema.label}`
+    return t('placeholder.select', props.schema.label)
   }
-  return `请输入${props.schema.label}`
+  return t('placeholder.input', props.schema.label)
 })
 
-const startPlaceholder = computed(() => `开始${props.schema.label}`)
-const endPlaceholder = computed(() => `结束${props.schema.label}`)
+const startPlaceholder = computed(() => t('placeholder.start', props.schema.label))
+const endPlaceholder = computed(() => t('placeholder.end', props.schema.label))
 
 function disabledDate(time: Date) {
   if (!props.schema.attributes.end_of_now) return false

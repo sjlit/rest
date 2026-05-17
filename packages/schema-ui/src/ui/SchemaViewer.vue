@@ -49,10 +49,11 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import type { Schema, Model, Action as ActionType, CRUDOptions } from '../core/types'
+import type { Schema, Model, Action as ActionType, CRUDOptions, Scenario } from '../core/types'
 import { CRUD } from '../runtime/crud'
 import { useSchemaUI } from '../runtime/useSchemaUI'
 import { clearSearchModel } from '../core/form'
+import { createDefaultTranslator } from '../core/i18n'
 import SchemaPage from './SchemaPage.vue'
 
 interface Props {
@@ -105,6 +106,10 @@ const emit = defineEmits<{
 }>()
 
 const globalConfig = useSchemaUI()
+const t = (key: string, ...args: any[]) => {
+  const fn = globalConfig?.i18n?.t || createDefaultTranslator()
+  return fn(key, ...args)
+}
 const crud = ref<CRUD | null>(null)
 const schemas = ref<Schema[]>([])
 const searching = ref(false)
@@ -126,7 +131,7 @@ const searchActionList = computed((): ActionType[] => {
   return [
     {
       name: 'search',
-      label: '搜索',
+      label: t('action.search'),
       type: 'primary',
       asyncCallback: async (model, schemas) => {
         searching.value = true
@@ -147,13 +152,13 @@ const rowActionList = computed((): ActionType[] => {
   return [
     {
       name: 'edit',
-      label: '编辑',
+      label: t('action.edit'),
       type: 'success',
       asyncCallback: async (model) => handleEdit(model),
     },
     {
       name: 'delete',
-      label: '删除',
+      label: t('action.delete'),
       type: 'danger',
       callback: (model) => handleDelete(model),
     },
@@ -165,7 +170,7 @@ const batchActionList = computed((): ActionType[] => {
   const defaults: ActionType[] = []
   defaults.push({
     name: 'export',
-    label: '导出',
+    label: t('action.export'),
     callback: () => {
       crud.value!.exportModels().catch((e) => console.error('Export failed:', e))
     },
@@ -178,7 +183,7 @@ const formActionList = computed((): ActionType[] => {
   return [
     {
       name: 'save',
-      label: '保存',
+      label: t('action.save'),
       type: 'primary',
       asyncCallback: async (model) => {
         crud.value!.resetError()
@@ -311,7 +316,7 @@ function handleSelectionChange(selection: any[]) {
   selections.value = selection
 }
 
-async function handleFormSubmit(model: Model, scenario: string) {
+async function handleFormSubmit(model: Model, scenario: Scenario) {
   crud.value!.resetError()
   try {
     if (scenario === 'create') {

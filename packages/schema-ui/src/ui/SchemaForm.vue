@@ -54,19 +54,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import type { Schema, Model, Action as ActionType } from '../core/types'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, inject } from 'vue'
+import type { Schema, Model, Action as ActionType, Scenario } from '../core/types'
+import type { SchemaUIConfig } from '../config'
 import { decode, encode } from '../core/codec'
-import { generateSchemaRule, checkSchemaVisible } from '../core/form'
+import { generateSchemaRule, checkSchemaVisible, filterByScenario } from '../core/form'
 import { createDefaultTranslator } from '../core/i18n'
-import { useSchemaUI } from '../runtime/useSchemaUI'
+import { GLOBAL_CONFIG_KEY } from '../config'
 import FormItem from './parts/FormItem.vue'
 import Action from './parts/Action.vue'
 
 interface Props {
   size?: string
   schemas: Schema[]
-  scenario?: string
+  scenario?: Scenario
   labelWidth?: string
   model?: Model
   inline?: boolean
@@ -94,7 +95,7 @@ const emit = defineEmits<{
 const formRef = ref<any>(null)
 const formElement = ref<HTMLElement | null>(null)
 const activeModel = ref<Model>({})
-const formWidth = ref<number>(typeof window !== 'undefined' ? window.innerWidth : 1200)
+const formWidth = ref<number>(1200)
 const fieldErrors = ref<Record<string, string>>({})
 const stopWatchers: (() => void)[] = []
 let resizeHandler: (() => void) | null = null
@@ -104,12 +105,8 @@ const LABEL_WIDTHS = { MOBILE: '80px', DESKTOP: '120px' }
 const COL_SPANS = { FULL: 24, HALF: 12, THIRD: 8 }
 
 const displayColumns = computed(() => {
-  return props.schemas.filter(schema => {
-    if (schema.enable === 0) return false
-    if (schema.attributes.invisible) return false
-    if (!Array.isArray(schema.scenarios)) return false
-    if (!schema.scenarios.includes(props.scenario)) return false
-    return checkSchemaVisible(schema, activeModel.value)
+  return filterByScenario(props.schemas, props.scenario, {
+    visibleCheck: (schema) => checkSchemaVisible(schema, activeModel.value),
   })
 })
 
@@ -124,10 +121,7 @@ const labelWidthComputed = computed(() => {
   return formWidth.value < BREAKPOINTS.MOBILE ? LABEL_WIDTHS.MOBILE : LABEL_WIDTHS.DESKTOP
 })
 
-let globalConfig: any = null
-try {
-  globalConfig = useSchemaUI()
-} catch { /* SchemaPage may be used without plugin */ }
+const globalConfig = inject<SchemaUIConfig | null>(GLOBAL_CONFIG_KEY, null)
 
 const formRules = computed(() => {
   const rules: Record<string, any> = {}

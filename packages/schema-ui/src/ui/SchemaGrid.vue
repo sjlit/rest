@@ -69,15 +69,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onUnmounted } from 'vue'
-import type { Schema, Model, Action as ActionType } from '../core/types'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import type { Schema, Model, Action as ActionType, Scenario } from '../core/types'
+import { filterByScenario } from '../core/form'
 import Cell from './parts/Cell.vue'
 import Action from './parts/Action.vue'
 
 interface Props {
   size?: string
   schemas: Schema[]
-  scenario?: string
+  scenario?: Scenario
   selection?: boolean
   models: Model[]
   actions?: ActionType[]
@@ -106,12 +107,12 @@ const isMobileView = ref(false)
 let mql: MediaQueryList | null = null
 let mediaListener: ((e: MediaQueryListEvent) => void) | null = null
 
-if (typeof window !== 'undefined') {
+onMounted(() => {
   mql = window.matchMedia('(max-width: 768px)')
   isMobileView.value = mql.matches
   mediaListener = (e) => { isMobileView.value = e.matches }
   mql.addEventListener?.('change', mediaListener)
-}
+})
 
 onUnmounted(() => {
   if (mql && mediaListener) {
@@ -124,14 +125,7 @@ const enableMobileTable = computed(() => {
   return isMobileView.value
 })
 
-const visibleSchemas = computed(() => {
-  return props.schemas.filter((v) => {
-    if (v.enable === 0) return false
-    if (!Array.isArray(v.scenarios)) return false
-    if (!v.scenarios.includes(props.scenario)) return false
-    return !v.attributes.invisible
-  })
-})
+const visibleSchemas = computed(() => filterByScenario(props.schemas, props.scenario))
 
 function getMobilePrimaryLabel(model: Model): string {
   const pkSchema = props.schemas.find((s) => s.primary_key === 1)

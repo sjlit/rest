@@ -6,7 +6,7 @@
   </template>
   <template v-else-if="schema.format === 'boolean' || schema.format === 'bool'">
     <el-tag round :type="isTrue ? 'success' : 'danger'">
-      {{ isTrue ? '是' : '否' }}
+      {{ isTrue ? t('boolean.true') : t('boolean.false') }}
     </el-tag>
   </template>
   <template v-else>
@@ -17,6 +17,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Model, Schema } from '../../core/types'
+import { createDefaultTranslator } from '../../core/i18n'
 
 interface Props {
   model: Model
@@ -24,6 +25,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const t = createDefaultTranslator()
 
 const rawValue = computed(() => {
   const val = props.model[props.schema.column]
