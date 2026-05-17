@@ -280,7 +280,7 @@ function handlePageChange(index: number) {
 
 function handleSortChange(e: { column: string; order: 'ascending' | 'descending' | null }) {
   if (!e.order) {
-    crud.value!.setSortable('', '')
+    crud.value!.setSortable('', 'ascending')
   } else {
     crud.value!.setSortable(e.column, e.order)
   }

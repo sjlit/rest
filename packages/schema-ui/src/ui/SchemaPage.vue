@@ -257,7 +257,7 @@ function handleSelectionChange(selection: any[]) {
 }
 
 function handleSortChange(e: { prop: string; order: 'ascending' | 'descending' | null }) {
-  emit('sortChange', e)
+  emit('sortChange', { column: e.prop, order: e.order })
 }
 
 function handlePageChange(index: number) {

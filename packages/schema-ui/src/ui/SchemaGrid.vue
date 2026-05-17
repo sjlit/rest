@@ -149,6 +149,6 @@ function handleSelectionChange(selection: any[]) {
 }
 
 function handleSortChange(e: { prop: string; order: 'ascending' | 'descending' | null }) {
-  emit('sort', e)
+  emit('sort', { column: e.prop, order: e.order })
 }
 </script>
