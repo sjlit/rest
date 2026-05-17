@@ -1,5 +1,6 @@
 <template>
   <SchemaPage
+    ref="schemaPageRef"
     :schemas="schemas"
     :models="crud?.getModels() || []"
     :pagination="pagination"
@@ -109,6 +110,7 @@ const schemas = ref<Schema[]>([])
 const searching = ref(false)
 const isReady = ref(false)
 const selections = ref<any[]>([])
+const schemaPageRef = ref<any>(null)
 
 const pagination = computed(() => {
   if (!crud.value) return { index: 1, size: 15, totalCount: 0 }
@@ -147,7 +149,7 @@ const rowActionList = computed((): ActionType[] => {
       name: 'edit',
       label: '编辑',
       type: 'success',
-      callback: (model) => handleEdit(model),
+      asyncCallback: async (model) => handleEdit(model),
     },
     {
       name: 'delete',
@@ -239,6 +241,8 @@ watch(
   () => [props.module, props.table],
   () => {
     isReady.value = false
+    crud.value = null
+    schemas.value = []
     init().catch((err) => {
       console.error('[SchemaViewer] init failed:', err)
     })
@@ -260,9 +264,22 @@ function handleCreate() {
   // SchemaPage handles dialog display
 }
 
-function handleEdit(model: Model) {
-  // SchemaPage handles dialog display with the row model
-  // Full model fetch would require exposing setFormModel on SchemaPage via template ref
+async function handleEdit(model: Model) {
+  try {
+    searching.value = true
+    const pk = crud.value!.findModelPrimaryKey(model)
+    if (pk !== undefined && pk !== null && pk !== '') {
+      const detail = await crud.value!.getModel(String(pk))
+      schemaPageRef.value?.openEdit(detail)
+    } else {
+      schemaPageRef.value?.openEdit(model)
+    }
+  } catch (e) {
+    console.error('Failed to fetch detail:', e)
+    schemaPageRef.value?.openEdit(model)
+  } finally {
+    searching.value = false
+  }
 }
 
 function handleDelete(model: Model) {

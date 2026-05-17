@@ -96,6 +96,7 @@ const activeModel = ref<Model>({})
 const formWidth = ref<number>(typeof window !== 'undefined' ? window.innerWidth : 1200)
 const fieldErrors = ref<Record<string, string>>({})
 const stopWatchers: (() => void)[] = []
+let resizeHandler: (() => void) | null = null
 
 const BREAKPOINTS = { MOBILE: 768, TABLET: 960 }
 const LABEL_WIDTHS = { MOBILE: '80px', DESKTOP: '120px' }
@@ -175,6 +176,13 @@ onMounted(() => {
     formWidth.value = formElement.value.offsetWidth
   }
 
+  resizeHandler = () => {
+    if (formElement.value) {
+      formWidth.value = formElement.value.offsetWidth
+    }
+  }
+  window.addEventListener('resize', resizeHandler)
+
   stopWatchers.push(
     watch(
       () => props.model,
@@ -189,6 +197,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopWatchers.forEach((stop) => stop())
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler)
+  }
 })
 
 async function submit(): Promise<Model> {

@@ -69,7 +69,8 @@ export function checkSchemaVisible(schema: Schema, model: Record<string, any>): 
 
   for (const cond of conditions) {
     const modelValue = model[cond.column]
-    if (!cond.values.includes(modelValue)) {
+    const found = cond.values.some((v) => String(v) === String(modelValue))
+    if (!found) {
       return false
     }
   }

@@ -190,6 +190,7 @@ const formTitle = computed(() => {
 })
 
 const formWidth = computed(() => {
+  if (typeof window === 'undefined') return '60%'
   const width = window.innerWidth
   if (width < 768) return '96%'
   if (width <= 1180) return '80%'
@@ -268,4 +269,6 @@ function handleSortChange(e: { column: string; order: 'ascending' | 'descending'
 function handlePageChange(index: number) {
   emit('pageChange', index)
 }
+
+defineExpose({ openEdit: handleEdit })
 </script>

@@ -110,6 +110,7 @@
       :disabled="isDisabled || isReadonly"
       :file-list="fileList"
       @success="handleUploadSuccess"
+      @remove="handleUploadRemove"
     >
       <el-button type="primary">上传</el-button>
     </el-upload>
@@ -164,7 +165,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Model, Schema } from '../../core/types'
 
 interface Props {
@@ -198,8 +199,26 @@ const isMultiSelect = computed(() => {
 
 const fileList = ref<any[]>([])
 
+function syncFileList() {
+  const url = props.model[props.schema.column]
+  if (url) {
+    fileList.value = [{ name: String(url).split('/').pop() || url, url }]
+  } else {
+    fileList.value = []
+  }
+}
+
+watch(() => props.model[props.schema.column], syncFileList, { immediate: true })
+
 function handleUploadSuccess(response: any) {
-  props.model[props.schema.column] = response.url || response.data?.url || response
+  const url = response.url || response.data?.url || response
+  props.model[props.schema.column] = url
+  fileList.value = [{ name: String(url).split('/').pop() || url, url }]
+}
+
+function handleUploadRemove() {
+  props.model[props.schema.column] = ''
+  fileList.value = []
 }
 
 const placeholder = computed(() => {
