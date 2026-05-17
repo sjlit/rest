@@ -22,7 +22,7 @@
               :error="fieldErrors[schema.column]"
             >
               <slot name="default" :model="activeModel" :schema="schema">
-                <FormItem :model="activeModel" :schema="schema" :scenario="scenario" />
+                <FormItem v-model="activeModel[schema.column]" :schema="schema" :scenario="scenario" />
               </slot>
             </el-form-item>
           </el-col>
@@ -36,7 +36,7 @@
             :error="fieldErrors[schema.column]"
           >
             <slot name="default" :model="activeModel" :schema="schema">
-              <FormItem :model="activeModel" :schema="schema" :scenario="scenario" />
+              <FormItem v-model="activeModel[schema.column]" :schema="schema" :scenario="scenario" />
             </slot>
           </el-form-item>
         </template>
@@ -58,6 +58,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import type { Schema, Model, Action as ActionType } from '../core/types'
 import { decode, encode } from '../core/codec'
 import { generateSchemaRule, checkSchemaVisible } from '../core/form'
+import { createDefaultTranslator } from '../core/i18n'
 import { useSchemaUI } from '../runtime/useSchemaUI'
 import FormItem from './parts/FormItem.vue'
 import Action from './parts/Action.vue'
@@ -131,16 +132,7 @@ try {
 const formRules = computed(() => {
   const rules: Record<string, any> = {}
   if (props.scenario === 'search') return rules
-  const t = globalConfig?.i18n?.t || ((key: string, args?: any[]) => {
-    const messages: Record<string, string> = {
-      'validation.required': args ? `${args[0]}不能为空` : '必填项',
-      'validation.min': args ? `${args[0]}不能少于${args[1]}个字符` : '低于最小长度',
-      'validation.max': args ? `${args[0]}不能超过${args[1]}个字符` : '超出最大长度',
-      'validation.pattern': args ? `${args[0]}格式不正确` : '格式不正确',
-      'validation.type': args ? `${args[0]}格式类型不正确` : '格式类型不正确',
-    }
-    return messages[key] || key
-  })
+  const t = globalConfig?.i18n?.t || createDefaultTranslator()
   for (const schema of displayColumns.value) {
     rules[schema.column] = generateSchemaRule(t, schema, props.scenario)
   }

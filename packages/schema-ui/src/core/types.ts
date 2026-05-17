@@ -1,9 +1,11 @@
+export type Scenario = 'create' | 'update' | 'delete' | 'search' | 'list' | 'detail' | 'export' | 'import'
+
 export interface SchemaRule {
   min: number
   max: number
-  type: string
+  type: 'string' | 'number' | 'integer' | 'float' | 'boolean' | 'array' | 'object' | 'date' | 'email' | 'url' | string
   unique: boolean
-  required: string[]
+  required: Scenario[]
   regular?: string
   safe?: boolean
 }
@@ -40,11 +42,11 @@ export interface DropdownOptions {
 }
 
 export interface SchemaAttribute {
-  match: string
+  match: 'exactly' | 'fuzzy' | string
   tag?: string
   default_value: string
-  readonly: string[]
-  disable: string[]
+  readonly: Scenario[]
+  disable: Scenario[]
   visible: VisibleCondition[]
   invisible: boolean
   end_of_now: boolean
@@ -82,7 +84,7 @@ export interface Schema {
   native: number
   primary_key: number
   expression: string
-  scenarios: string[]
+  scenarios: Scenario[]
   rules: SchemaRule
   attributes: SchemaAttribute
   relations: Relation

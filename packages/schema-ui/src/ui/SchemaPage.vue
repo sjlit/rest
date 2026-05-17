@@ -250,7 +250,9 @@ function handleCreate() {
 
 function handleEdit(model: Model) {
   formScenario.value = 'update'
-  formModel.value = { ...model }
+  formModel.value = typeof structuredClone === 'function'
+    ? structuredClone(model)
+    : JSON.parse(JSON.stringify(model))
   emit('edit', model)
   formVisible.value = true
 }

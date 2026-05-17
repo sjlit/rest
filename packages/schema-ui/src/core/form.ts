@@ -15,7 +15,7 @@ export function generateSchemaRule(
   const rules: any[] = []
   const rule = schema.rules
 
-  if (rule.required && rule.required.includes(scenario)) {
+  if (rule.required && (rule.required as string[]).includes(scenario)) {
     rules.push({
       required: true,
       message: t('validation.required', [schema.label]),
@@ -82,9 +82,9 @@ export function checkSchemaVisible(schema: Schema, model: Record<string, any>): 
  * 生成字段描述文本
  */
 export function generateSchemaDescription(
-  t: (key: string, ...args: any[]) => string,
+  _t: (key: string, ...args: any[]) => string,
   schema: Schema,
-  scenario: string
+  _scenario: string
 ): string {
   if (schema.attributes.tooltip) {
     return schema.attributes.tooltip
@@ -97,7 +97,7 @@ export function generateSchemaDescription(
  */
 export function clearSearchModel(
   model: Record<string, any>,
-  schemas: Schema[]
+  _schemas: Schema[]
 ): Record<string, any> {
   const result: Record<string, any> = {}
   for (const key in model) {

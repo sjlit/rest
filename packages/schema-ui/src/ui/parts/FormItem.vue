@@ -1,7 +1,7 @@
 <template>
-  <template v-if="isVisible('time')">
+  <template v-if="componentType === 'time'">
     <el-time-select
-      v-model="model[schema.column]"
+      v-model="columnValue"
       start="00:00"
       step="00:15"
       end="23:59"
@@ -10,10 +10,10 @@
       format="HH:mm"
     />
   </template>
-  <template v-else-if="isVisible('date')">
+  <template v-else-if="componentType === 'date'">
     <el-date-picker
       v-if="isRange"
-      v-model="model[schema.column]"
+      v-model="columnValue"
       type="daterange"
       :disabled="isDisabled || isReadonly"
       :editable="false"
@@ -25,7 +25,7 @@
     />
     <el-date-picker
       v-else
-      v-model="model[schema.column]"
+      v-model="columnValue"
       type="date"
       :disabled="isDisabled || isReadonly"
       :editable="false"
@@ -35,10 +35,10 @@
       :disabled-date="disabledDate"
     />
   </template>
-  <template v-else-if="isVisible('datetime')">
+  <template v-else-if="componentType === 'datetime'">
     <el-date-picker
       v-if="isRange"
-      v-model="model[schema.column]"
+      v-model="columnValue"
       type="datetimerange"
       :disabled="isDisabled || isReadonly"
       :editable="false"
@@ -50,7 +50,7 @@
     />
     <el-date-picker
       v-else
-      v-model="model[schema.column]"
+      v-model="columnValue"
       type="datetime"
       :disabled="isDisabled || isReadonly"
       :editable="false"
@@ -60,9 +60,9 @@
       :disabled-date="disabledDate"
     />
   </template>
-  <template v-else-if="isVisible('dropdown')">
+  <template v-else-if="componentType === 'dropdown'">
     <el-select
-      v-model="model[schema.column]"
+      v-model="columnValue"
       :multiple="isMultiSelect"
       :disabled="isDisabled || isReadonly"
       :placeholder="placeholder"
@@ -79,15 +79,15 @@
       />
     </el-select>
   </template>
-  <template v-else-if="isVisible('search_boolean')">
-    <el-select v-model="model[schema.column]" clearable>
+  <template v-else-if="componentType === 'search_boolean'">
+    <el-select v-model="columnValue" clearable>
       <el-option label="是" :value="true" />
       <el-option label="否" :value="false" />
     </el-select>
   </template>
-  <template v-else-if="isVisible('cascader')">
+  <template v-else-if="componentType === 'cascader'">
     <el-cascader
-      v-model="model[schema.column]"
+      v-model="columnValue"
       :options="schema.attributes.values"
       :disabled="isDisabled || isReadonly"
       filterable
@@ -96,10 +96,10 @@
       :validate-event="false"
     />
   </template>
-  <template v-else-if="isVisible('boolean')">
-    <el-switch v-model="model[schema.column]" :disabled="isDisabled || isReadonly" />
+  <template v-else-if="componentType === 'boolean'">
+    <el-switch v-model="columnValue" :disabled="isDisabled || isReadonly" />
   </template>
-  <template v-else-if="isVisible('file')">
+  <template v-else-if="componentType === 'file'">
     <el-upload
       :action="schema.attributes.upload_url"
       :disabled="isDisabled || isReadonly"
@@ -110,18 +110,18 @@
       <el-button type="primary">上传</el-button>
     </el-upload>
   </template>
-  <template v-else-if="isVisible('password')">
+  <template v-else-if="componentType === 'password'">
     <el-input
-      v-model="model[schema.column]"
+      v-model="columnValue"
       :disabled="isDisabled"
       :readonly="isReadonly"
       show-password
       :placeholder="placeholder"
     />
   </template>
-  <template v-else-if="isVisible('multistr')">
+  <template v-else-if="componentType === 'multistr'">
     <el-input
-      v-model="model[schema.column]"
+      v-model="columnValue"
       type="textarea"
       :disabled="isDisabled"
       :readonly="isReadonly"
@@ -129,9 +129,9 @@
       :maxlength="schema.rules.max > 0 ? schema.rules.max : undefined"
     />
   </template>
-  <template v-else-if="isVisible('number')">
+  <template v-else-if="componentType === 'number'">
     <el-input
-      v-model.number="model[schema.column]"
+      v-model.number="columnValue"
       :disabled="isDisabled"
       :readonly="isReadonly"
       :prefix-icon="schema.attributes.icon || ''"
@@ -145,7 +145,7 @@
   </template>
   <template v-else>
     <el-input
-      v-model="model[schema.column]"
+      v-model="columnValue"
       :disabled="isDisabled"
       :readonly="isReadonly"
       :prefix-icon="schema.attributes.icon || ''"
@@ -161,19 +161,27 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { Model, Schema } from '../../core/types'
+import type { Schema } from '../../core/types'
 
 interface Props {
-  model: Model
+  modelValue: any
   schema: Schema
   scenario?: string
 }
 
 const props = defineProps<Props>()
 
+const emit = defineEmits<{
+  'update:modelValue': [value: any]
+}>()
+
 const scenario = computed(() => props.scenario || 'create')
 const isSearch = computed(() => scenario.value === 'search')
-const isRange = computed(() => scenario.value === 'search')
+
+const columnValue = computed({
+  get: () => props.modelValue,
+  set: (val) => emit('update:modelValue', val),
+})
 
 const isDisabled = computed(() => {
   return props.schema.attributes.disable.includes(scenario.value)
@@ -192,10 +200,12 @@ const isMultiSelect = computed(() => {
   return false
 })
 
+const isRange = computed(() => isSearch.value)
+
 const fileList = ref<any[]>([])
 
 function syncFileList() {
-  const url = props.model[props.schema.column]
+  const url = props.modelValue
   if (url) {
     fileList.value = [{ name: String(url).split('/').pop() || url, url }]
   } else {
@@ -203,16 +213,16 @@ function syncFileList() {
   }
 }
 
-watch(() => props.model[props.schema.column], syncFileList, { immediate: true })
+watch(() => props.modelValue, syncFileList, { immediate: true })
 
 function handleUploadSuccess(response: any) {
   const url = response.url || response.data?.url || response
-  props.model[props.schema.column] = url
+  columnValue.value = url
   fileList.value = [{ name: String(url).split('/').pop() || url, url }]
 }
 
 function handleUploadRemove() {
-  props.model[props.schema.column] = ''
+  columnValue.value = ''
   fileList.value = []
 }
 
@@ -234,35 +244,24 @@ function disabledDate(time: Date) {
   return time.getTime() > today.getTime()
 }
 
-function isVisible(type: string): boolean {
+const componentType = computed(() => {
   const fmt = props.schema.format
   const tp = props.schema.type
 
-  switch (type) {
-    case 'number':
-      return ['integer', 'float', 'decimal'].includes(fmt) || ['integer', 'float', 'double'].includes(tp)
-    case 'password':
-      return ['password', 'pass'].includes(fmt)
-    case 'time':
-      return fmt === 'time'
-    case 'date':
-      return fmt === 'date'
-    case 'datetime':
-      return ['datetime', 'timestamp'].includes(fmt)
-    case 'dropdown':
-      return ['dropdown', 'multiSelect'].includes(fmt)
-    case 'cascader':
-      return fmt === 'cascader'
-    case 'boolean':
-      return scenario.value !== 'search' && ['bool', 'boolean'].includes(fmt)
-    case 'search_boolean':
-      return scenario.value === 'search' && ['bool', 'boolean'].includes(fmt)
-    case 'file':
-      return fmt === 'file' && !!props.schema.attributes.upload_url
-    case 'multistr':
-      return scenario.value !== 'search' && fmt === 'text'
-    default:
-      return fmt === 'string'
+  if (['integer', 'float', 'decimal'].includes(fmt) || ['integer', 'float', 'double'].includes(tp)) {
+    return 'number'
   }
-}
+  if (['password', 'pass'].includes(fmt)) return 'password'
+  if (fmt === 'time') return 'time'
+  if (fmt === 'date') return 'date'
+  if (['datetime', 'timestamp'].includes(fmt)) return 'datetime'
+  if (['dropdown', 'multiSelect'].includes(fmt)) return 'dropdown'
+  if (fmt === 'cascader') return 'cascader'
+  if (['bool', 'boolean'].includes(fmt)) {
+    return isSearch.value ? 'search_boolean' : 'boolean'
+  }
+  if (fmt === 'file' && !!props.schema.attributes.upload_url) return 'file'
+  if (!isSearch.value && fmt === 'text') return 'multistr'
+  return 'text'
+})
 </script>
