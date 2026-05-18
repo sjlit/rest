@@ -18,7 +18,7 @@
 import { computed } from 'vue'
 import type { Model, Schema } from '../../core/types'
 import { createDefaultTranslator } from '../../core/i18n'
-import '../styles/cell.css'
+import '../../styles/cell.css'
 
 interface Props {
   model: Model
