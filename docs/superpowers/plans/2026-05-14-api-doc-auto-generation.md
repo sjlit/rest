@@ -979,10 +979,10 @@ func TestIntegrationOpenAPIEndpoint(t *testing.T) {
     }
 
     mux := http.NewServeMux()
-    userResource := NewResource(userModel,
-        WithRouter[IntegUser](&testRouter{mux: mux}),
-        WithPrefix[IntegUser]("/api/v1"),
-    )
+    userResource := NewResource(userModel, ResourceConfig{
+        Router: &testRouter{mux: mux},
+        Prefix: "/api/v1",
+    })
     userResource.Register()
 
     req := httptest.NewRequest(http.MethodGet, "/api/v1/integration/user/openapi.json", nil)
@@ -1072,10 +1072,10 @@ func TestIntegrationOpenAPIDisabledByDefault(t *testing.T) {
     }
 
     mux := http.NewServeMux()
-    userResource := NewResource(userModel,
-        WithRouter[IntegUser](&testRouter{mux: mux}),
-        WithPrefix[IntegUser]("/api/v1"),
-    )
+    userResource := NewResource(userModel, ResourceConfig{
+        Router: &testRouter{mux: mux},
+        Prefix: "/api/v1",
+    })
     userResource.Register()
 
     req := httptest.NewRequest(http.MethodGet, "/api/v1/integration/user/openapi.json", nil)
