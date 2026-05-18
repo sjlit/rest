@@ -5,13 +5,8 @@
         <template #title>
           <span class="mobile-primary-label">{{ getMobilePrimaryLabel(model) }}</span>
           <span class="mobile-actions" v-if="actions.length > 0">
-            <Action
-              v-for="action in actions"
-              :key="action.name"
-              :action="action"
-              :model="model"
-              @click="(_, loading) => handleActionClick(action, model, loading)"
-            />
+            <Action v-for="action in actions" :key="action.name" :action="action" :model="model"
+              @click="(_, loading) => handleActionClick(action, model, loading)" />
           </span>
         </template>
         <div v-for="schema in visibleSchemas" :key="schema.column" class="mobile-preview-row">
@@ -26,39 +21,25 @@
     </el-collapse>
   </template>
   <template v-else>
-    <el-table
-      :data="models"
-      :size="size"
-      :border="true"
-      :loading="loading"
-      v-bind="gridProps"
-      @selection-change="handleSelectionChange"
-      @sort-change="handleSortChange"
-    >
+    <el-table :data="models" :size="size" :border="true" :loading="loading" v-bind="gridProps"
+      @selection-change="handleSelectionChange" @sort-change="handleSortChange">
       <el-table-column v-if="selection" type="selection" width="55" />
-      <el-table-column
-        v-for="schema in visibleSchemas"
-        :key="schema.column"
-        :prop="schema.column"
-        :label="schema.label"
-        :sortable="schema.attributes.sort ? 'custom' : false"
-        show-overflow-tooltip
-      >
+      <el-table-column v-for="schema in visibleSchemas" :key="schema.column" :prop="schema.column" :label="schema.label"
+        :sortable="schema.attributes.sort ? 'custom' : false" show-overflow-tooltip>
         <template #default="scope">
-          <slot :model="scope.row" :schema="schema">
-            <Cell :model="scope.row" :schema="schema" />
-          </slot>
+          <template v-if="scope">
+            <slot :model="scope.row" :schema="schema">
+              <Cell :model="scope.row" :schema="schema" />
+            </slot>
+          </template>
         </template>
       </el-table-column>
       <el-table-column v-if="actions.length > 0" fixed="right" class-name="schema-grid-actions">
         <template #default="scope">
-          <Action
-            v-for="action in actions"
-            :key="action.name"
-            :action="action"
-            :model="scope.row"
-            @click="(_, loading) => handleActionClick(action, scope.row, loading)"
-          />
+          <template v-if="scope">
+            <Action v-for="action in actions" :key="action.name" :action="action" :model="scope.row"
+              @click="(_, loading) => handleActionClick(action, scope.row, loading)" />
+          </template>
         </template>
       </el-table-column>
       <template #empty>
@@ -74,6 +55,7 @@ import type { Schema, Model, Action as ActionType, Scenario } from '../core/type
 import { filterByScenario } from '../core/form'
 import Cell from './parts/Cell.vue'
 import Action from './parts/Action.vue'
+import '../styles/grid.css'
 
 interface Props {
   size?: string
