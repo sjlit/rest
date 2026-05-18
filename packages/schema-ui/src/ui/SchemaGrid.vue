@@ -55,7 +55,7 @@ import type { Schema, Model, Action as ActionType, Scenario } from '../core/type
 import { filterByScenario } from '../core/form'
 import Cell from './parts/Cell.vue'
 import Action from './parts/Action.vue'
-import '../styles/grid.css'
+import '../styles/grid.scss'
 
 interface Props {
   size?: string

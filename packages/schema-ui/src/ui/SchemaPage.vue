@@ -81,7 +81,7 @@ import { createDefaultTranslator } from '../core/i18n'
 import { GLOBAL_CONFIG_KEY } from '../config'
 import SchemaForm from './SchemaForm.vue'
 import SchemaGrid from './SchemaGrid.vue'
-import '../styles/page.css'
+import '../styles/page.scss'
 
 interface Props {
   schemas: Schema[]

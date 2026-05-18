@@ -63,7 +63,7 @@ import { createDefaultTranslator } from '../core/i18n'
 import { GLOBAL_CONFIG_KEY } from '../config'
 import FormItem from './parts/FormItem.vue'
 import Action from './parts/Action.vue'
-import '../styles/form.css'
+import '../styles/form.scss'
 
 interface Props {
   size?: string
