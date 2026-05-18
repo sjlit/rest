@@ -24,6 +24,7 @@ ui/        -- UI 组件层（Element Plus 组件封装）
 - **全自动 CRUD**：`SchemaViewer` 组件一行代码完成完整的增删改查页面
 - **手动控制**：`SchemaPage` 组件提供底层编排，外部控制数据流
 - **响应式设计**：`SchemaGrid` 自动适配移动端（折叠面板）和桌面端（表格）
+- **内置样式体系**：基于 Element Plus CSS 变量的自适应阴影、间距系统和响应式断点
 - **插件化配置**：通过 Vue Plugin 全局注入 HTTP 客户端、权限、路由、国际化
 - **类型安全**：完整的 TypeScript 类型定义，与 REST Go 结构体对齐
 - **高度可扩展**：丰富的插槽系统支持自定义搜索表单、表格列、表单字段
@@ -1084,6 +1085,65 @@ npm install
 npm run dev    # 监听模式构建
 ```
 
+### 在独立 Vue 项目中本地引用
+
+如果你有一个**独立的 Vue 前端项目**想要在开发时引用本库，推荐以下两种方式：
+
+#### 方式一：Vite Alias 指向源码（推荐，支持热更新）
+
+在消费项目的 `vite.config.ts` 中配置路径别名，直接指向 `@ace/schema-ui` 的源码入口：
+
+```typescript
+import { defineConfig } from 'vite'
+import { resolve } from 'path'
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      '@ace/schema-ui': resolve(__dirname, '/absolute/path/to/rest/packages/schema-ui/src/index.ts'),
+    },
+  },
+})
+```
+
+**步骤**：
+1. 在消费项目中安装本库的 `peerDependencies`：
+   ```bash
+   npm install vue@^3.3.0 element-plus@^2.12.0 @element-plus/icons-vue@^2.3.0
+   ```
+2. 在 `vite.config.ts` 添加上述 `alias` 配置（路径替换为你本地的实际绝对路径）。
+3. 启动消费项目，修改 `schema-ui` 源码即可实时热更新。
+
+> **注意**：此方式要求消费项目具备编译 `.vue` 单文件组件的能力（已安装 `@vitejs/plugin-vue`）。
+
+#### 方式二：本地路径安装 + Watch 构建
+
+如果你不方便修改消费项目的 Vite 配置，可以通过 `file:` 协议直接安装本地包：
+
+```bash
+# 在消费项目中执行
+npm install /absolute/path/to/rest/packages/schema-ui
+```
+
+`package.json` 会自动添加：
+```json
+"dependencies": {
+  "@ace/schema-ui": "file:/absolute/path/to/rest/packages/schema-ui"
+}
+```
+
+**步骤**：
+1. 在消费项目中执行上述 `npm install` 命令。
+2. 确保消费项目已安装 `peerDependencies`（`vue`、`element-plus`、`@element-plus/icons-vue`）。
+3. 在 `schema-ui` 目录启动监听构建：
+   ```bash
+   cd packages/schema-ui
+   npm run dev   # vite build --watch，自动更新 dist/
+   ```
+4. 消费项目刷新页面即可获得最新构建产物。
+
+> **提示**：`npm run dev` 会监听源码变化并自动重新打包到 `dist/`。由于 `file:` 链接指向包的根目录，引用的是 `dist/` 下的构建产物，因此必须保持 watch 构建处于运行状态。
+
 ### 构建
 
 ```bash
@@ -1093,6 +1153,7 @@ npm run build  # 输出到 dist/ 目录
 输出文件：
 - `dist/schema-ui.es.js` — ESM 格式
 - `dist/schema-ui.cjs` — CJS 格式
+- `dist/style.css` — 组件样式（自动随 JS 注入，也可单独引用）
 - `dist/index.d.ts` — TypeScript 类型声明
 
 ### 类型检查
