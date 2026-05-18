@@ -19,8 +19,6 @@ import (
 )
 
 type (
-	ResourceOption[T any] func(*Resource[T])
-
 	Resource[T any] struct {
 		model         *Model[T]
 		prefix        string
@@ -32,40 +30,13 @@ type (
 	}
 )
 
-func WithRouter[T any](router Router) ResourceOption[T] {
-	return func(r *Resource[T]) {
-		r.router = router
-	}
-}
-
-func WithResponder[T any](responder Responder) ResourceOption[T] {
-	return func(r *Resource[T]) {
-		r.responder = responder
-	}
-}
-
-func WithFormatter[T any](formatter *formats.Formatter) ResourceOption[T] {
-	return func(r *Resource[T]) {
-		r.formatter = formatter
-	}
-}
-
-func WithPrefix[T any](prefix string) ResourceOption[T] {
-	return func(r *Resource[T]) {
-		r.prefix = prefix
-	}
-}
-
-func WithTenantResolve[T any](tenantResolve ResolveTenantFunc) ResourceOption[T] {
-	return func(r *Resource[T]) {
-		r.tenantResolve = tenantResolve
-	}
-}
-
-func WithUserResolve[T any](userResolve ResolveUserFunc) ResourceOption[T] {
-	return func(r *Resource[T]) {
-		r.userResolve = userResolve
-	}
+type ResourceConfig struct {
+	Router        Router
+	Responder     Responder
+	Formatter     *formats.Formatter
+	Prefix        string
+	TenantResolve ResolveTenantFunc
+	UserResolve   ResolveUserFunc
 }
 
 func (r *Resource[T]) buildUri(scenario string) (method string, uri string) {
@@ -532,12 +503,14 @@ func (r *Resource[T]) OpenApi(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func NewResource[T any](model *Model[T], opts ...ResourceOption[T]) *Resource[T] {
-	r := &Resource[T]{
-		model: model,
+func NewResource[T any](model *Model[T], cfg ResourceConfig) *Resource[T] {
+	return &Resource[T]{
+		model:         model,
+		router:        cfg.Router,
+		responder:     cfg.Responder,
+		formatter:     cfg.Formatter,
+		prefix:        cfg.Prefix,
+		tenantResolve: cfg.TenantResolve,
+		userResolve:   cfg.UserResolve,
 	}
-	for _, cb := range opts {
-		cb(r)
-	}
-	return r
 }
