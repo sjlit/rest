@@ -23,7 +23,6 @@ export const ScenarioUpdate = 'update'
 export const ScenarioDelete = 'delete'
 export const ScenarioSearch = 'search'
 export const ScenarioExport = 'export'
-export const ScenarioImport = 'import'
 export const ScenarioList = 'list'
 export const ScenarioDetail = 'detail'
 

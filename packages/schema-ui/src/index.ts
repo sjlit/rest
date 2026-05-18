@@ -45,7 +45,6 @@ export {
   ScenarioDelete,
   ScenarioSearch,
   ScenarioExport,
-  ScenarioImport,
   ScenarioList,
   ScenarioDetail,
   MatchExactly,

@@ -108,7 +108,6 @@ interface Schema {
 | `list` | 表格列表 |
 | `detail` | 详情页面 |
 | `export` | 导出数据 |
-| `import` | 导入数据 |
 
 一个字段可以同时属于多个场景：
 
@@ -505,8 +504,8 @@ GET /{apiPrefix}/{module}/{pluralTable}?page=1&pagesize=15&sort=-created_at&__fo
 ```json
 {
   "page": "1",
-  "pagesize": "15",
-  "totalCount": "100",
+  "page_size": "15",
+  "total_count": "100",
   "data": [
     { "id": 1, "username": "admin", "status": "active" }
   ]

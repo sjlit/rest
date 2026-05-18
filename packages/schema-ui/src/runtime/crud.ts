@@ -80,9 +80,6 @@ export class CRUD {
       case 'export':
         parts.push(singularName, 'export')
         break
-      case 'import':
-        parts.push(`${singularName}-import`)
-        break
     }
 
     return parts.join('/')
@@ -290,7 +287,7 @@ export class CRUD {
     const res = await this.opts.httpClient.get(this.__buildUri('search'), { params: queryParams })
     this.pagination.index = (parseInt(res.page) || 0) + 1
     this.pagination.size = parseInt(res.page_size) || 15
-    this.pagination.totalCount = parseInt(res.totalCount) || 0
+    this.pagination.totalCount = parseInt(res.total_count) || 0
     this.models = res.data || []
     return this.models
   }

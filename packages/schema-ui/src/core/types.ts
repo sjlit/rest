@@ -1,4 +1,4 @@
-export type Scenario = 'create' | 'update' | 'delete' | 'search' | 'list' | 'detail' | 'export' | 'import'
+export type Scenario = 'create' | 'update' | 'delete' | 'search' | 'list' | 'detail' | 'export'
 
 export interface SchemaRule {
   min: number

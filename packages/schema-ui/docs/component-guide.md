@@ -259,8 +259,8 @@ async function handleSearch(model: Model) {
   models.value = data.data
   pagination.value = {
     index: parseInt(data.page),
-    size: parseInt(data.pagesize),
-    totalCount: parseInt(data.totalCount),
+    size: parseInt(data.page_size),
+    totalCount: parseInt(data.total_count),
   }
   loading.value = false
 }

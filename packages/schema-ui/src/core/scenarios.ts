@@ -1,7 +1,7 @@
 import type { Scenario } from './types'
 
 const SCENARIO_VALUES: readonly string[] = [
-  'create', 'update', 'delete', 'search', 'list', 'detail', 'export', 'import',
+  'create', 'update', 'delete', 'search', 'list', 'detail', 'export',
 ]
 
 function isValidScenario(v: string): v is Scenario {

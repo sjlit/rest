@@ -415,7 +415,6 @@ await crud.exportModels()
 | `get` | `/{prefix}/{module}/{singular}/{pk}` | `/rest/user/admin/123` |
 | `search` | `/{prefix}/{module}/{plural}` | `/rest/user/admins` |
 | `export` | `/{prefix}/{module}/{singular}-export` | `/rest/user/admin-export` |
-| `import` | `/{prefix}/{module}/{singular}-import` | `/rest/user/admin-import` |
 
 ### 特殊情况
 
@@ -663,10 +662,10 @@ class CustomCRUD extends CRUD {
     )
     
     // 自定义响应解析
-    this.pagination.index = res.meta.page
-    this.pagination.size = res.meta.per_page
-    this.pagination.totalCount = res.meta.total
-    this.models = res.items || []
+    this.pagination.index = (parseInt(res.page) || 0) + 1
+    this.pagination.size = parseInt(res.page_size) || 15
+    this.pagination.totalCount = parseInt(res.total_count) || 0
+    this.models = res.data || []
     
     return this.models
   }

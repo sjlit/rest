@@ -15,6 +15,10 @@ export function generateSchemaRule(
   const rules: any[] = []
   const rule = schema.rules
 
+  if (rule.safe) {
+    return rules
+  }
+
   if (rule.required && (rule.required as string[]).includes(scenario)) {
     rules.push({
       required: true,

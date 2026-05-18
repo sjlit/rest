@@ -140,8 +140,8 @@ async function handleSearch(model: Model) {
   models.value = data.data
   pagination.value = {
     index: parseInt(data.page),
-    size: parseInt(data.pagesize),
-    totalCount: parseInt(data.totalCount),
+    size: parseInt(data.page_size),
+    totalCount: parseInt(data.total_count),
   }
 }
 
@@ -217,7 +217,7 @@ interface Schema {
   native: number
   primary_key: number   // 1 = 主键，0 = 非主键
   expression: string
-  scenarios: string[]   // 适用场景：create | update | delete | search | list | detail | export | import
+  scenarios: string[]   // 适用场景：create | update | delete | search | list | detail | export
   rules: SchemaRule
   attributes: SchemaAttribute
   relations: Relation
@@ -360,7 +360,6 @@ ScenarioUpdate  = 'update'
 ScenarioDelete  = 'delete'
 ScenarioSearch  = 'search'
 ScenarioExport  = 'export'
-ScenarioImport  = 'import'
 ScenarioList    = 'list'
 ScenarioDetail  = 'detail'
 ```
@@ -761,7 +760,6 @@ CRUD 类使用 `pluralize` 库根据 `module`、`table` 和 `scenario` 自动构
 | `get` | `/rest/user/admin/123` |
 | `search` | `/rest/user/admins` |
 | `export` | `/rest/user/admin-export` |
-| `import` | `/rest/user/admin-import` |
 
 Schema 加载 URI：
 - 有 module：`GET /rest/schema/{module}/{table}`
@@ -1050,8 +1048,8 @@ GET /{apiPrefix}/{module}/{pluralTable}?page=1&pagesize=15&sort=-created_at&__fo
 ```json
 {
   "page": "1",
-  "pagesize": "15",
-  "totalCount": "100",
+  "page_size": "15",
+  "total_count": "100",
   "data": [{ ... }]
 }
 ```
