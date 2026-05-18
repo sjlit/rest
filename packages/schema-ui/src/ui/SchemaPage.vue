@@ -44,8 +44,10 @@
             <slot name="gridview" :model="model" :schema="schema" />
           </template>
         </SchemaGrid>
-        <el-pagination v-if="showPagination" :page-size="pagination.size" :total="pagination.totalCount"
-          :current-page="pagination.index" layout="total, prev, pager, next" @current-change="handlePageChange" />
+        <div v-if="showPagination" class="schema-page-pagination">
+          <el-pagination :page-size="pagination.size" :total="pagination.totalCount"
+            :current-page="pagination.index" layout="total, prev, pager, next" @current-change="handlePageChange" />
+        </div>
       </div>
     </div>
 
@@ -66,6 +68,22 @@
         </template>
       </SchemaForm>
     </el-drawer>
+
+    <el-dialog v-if="formMode === 'dialog'" v-model="detailVisible" :title="detailTitle" :width="formWidth" draggable
+      destroy-on-close>
+      <el-descriptions :column="1" border>
+        <el-descriptions-item v-for="schema in detailSchemas" :key="schema.column" :label="schema.label">
+          <Cell :model="detailModel" :schema="schema" />
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-dialog>
+    <el-drawer v-else v-model="detailVisible" :title="detailTitle" :size="formWidth" destroy-on-close>
+      <el-descriptions :column="1" border>
+        <el-descriptions-item v-for="schema in detailSchemas" :key="schema.column" :label="schema.label">
+          <Cell :model="detailModel" :schema="schema" />
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-drawer>
   </div>
 </template>
 
@@ -79,6 +97,8 @@ import { createDefaultTranslator } from '../core/i18n'
 import { GLOBAL_CONFIG_KEY } from '../config'
 import SchemaForm from './SchemaForm.vue'
 import SchemaGrid from './SchemaGrid.vue'
+import Cell from './parts/Cell.vue'
+import '../styles/page.css'
 
 interface Props {
   schemas: Schema[]
@@ -143,6 +163,8 @@ const formScenario = ref<Scenario>('create')
 const searchModel = ref<Model>({ ...props.presetQuery })
 const formModel = ref<Model>({})
 const selections = ref<any[]>([])
+const detailVisible = ref(false)
+const detailModel = ref<Model>({})
 
 watch(() => props.presetQuery, (val) => {
   searchModel.value = { ...val }
@@ -157,10 +179,15 @@ const listSchemas = computed(() =>
 const formSchemas = computed(() =>
   filterByScenario(props.schemas, formScenario.value)
 )
+const detailSchemas = computed(() =>
+  filterByScenario(props.schemas, 'detail')
+)
 
 const formTitle = computed(() => {
   return formScenario.value === 'create' ? t('form.create') : t('form.edit')
 })
+
+const detailTitle = computed(() => t('form.detail'))
 
 const formWidth = computed(() => {
   if (typeof window === 'undefined') return '60%'
@@ -189,6 +216,7 @@ const rowActionList = computed((): ActionType[] => {
   if (props.readonly) return []
   if (props.rowActions.length > 0) return props.rowActions
   return [
+    { name: 'view', label: t('action.view'), type: 'info', callback: (model) => handleView(model) },
     { name: 'edit', label: t('action.edit'), type: 'success', callback: (model) => handleEdit(model) },
     { name: 'delete', label: t('action.delete'), type: 'danger', callback: (model) => emit('delete', model) },
   ]
@@ -245,5 +273,16 @@ function handlePageChange(index: number) {
   emit('pageChange', index)
 }
 
-defineExpose({ openEdit: handleEdit })
+function handleView(model: Model) {
+  detailModel.value = typeof structuredClone === 'function'
+    ? structuredClone(model)
+    : JSON.parse(JSON.stringify(model))
+  detailVisible.value = true
+}
+
+function closeForm() {
+  formVisible.value = false
+}
+
+defineExpose({ openEdit: handleEdit, openDetail: handleView, closeForm })
 </script>
