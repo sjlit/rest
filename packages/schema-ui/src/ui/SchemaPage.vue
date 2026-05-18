@@ -68,6 +68,22 @@
         </template>
       </SchemaForm>
     </el-drawer>
+
+    <el-dialog v-if="formMode === 'dialog'" v-model="detailVisible" :title="detailTitle" :width="formWidth" draggable
+      destroy-on-close>
+      <el-descriptions :column="1" border>
+        <el-descriptions-item v-for="schema in detailSchemas" :key="schema.column" :label="schema.label">
+          <Cell :model="detailModel" :schema="schema" />
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-dialog>
+    <el-drawer v-else v-model="detailVisible" :title="detailTitle" :size="formWidth" destroy-on-close>
+      <el-descriptions :column="1" border>
+        <el-descriptions-item v-for="schema in detailSchemas" :key="schema.column" :label="schema.label">
+          <Cell :model="detailModel" :schema="schema" />
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-drawer>
   </div>
 </template>
 
@@ -81,6 +97,7 @@ import { createDefaultTranslator } from '../core/i18n'
 import { GLOBAL_CONFIG_KEY } from '../config'
 import SchemaForm from './SchemaForm.vue'
 import SchemaGrid from './SchemaGrid.vue'
+import Cell from './parts/Cell.vue'
 import '../styles/page.scss'
 
 interface Props {
@@ -146,6 +163,8 @@ const formScenario = ref<Scenario>('create')
 const searchModel = ref<Model>({ ...props.presetQuery })
 const formModel = ref<Model>({})
 const selections = ref<any[]>([])
+const detailVisible = ref(false)
+const detailModel = ref<Model>({})
 
 watch(() => props.presetQuery, (val) => {
   searchModel.value = { ...val }
@@ -160,10 +179,15 @@ const listSchemas = computed(() =>
 const formSchemas = computed(() =>
   filterByScenario(props.schemas, formScenario.value)
 )
+const detailSchemas = computed(() =>
+  filterByScenario(props.schemas, 'detail')
+)
 
 const formTitle = computed(() => {
   return formScenario.value === 'create' ? t('form.create') : t('form.edit')
 })
+
+const detailTitle = computed(() => t('form.detail'))
 
 const formWidth = computed(() => {
   if (typeof window === 'undefined') return '60%'
@@ -229,6 +253,17 @@ function handleEdit(model: Model) {
   formVisible.value = true
 }
 
+function handleDetail(model: Model) {
+  detailModel.value = typeof structuredClone === 'function'
+    ? structuredClone(model)
+    : JSON.parse(JSON.stringify(model))
+  detailVisible.value = true
+}
+
+function closeForm() {
+  formVisible.value = false
+}
+
 function handleBatchAction(action: ActionType) {
   if (typeof action.callback === 'function') {
     action.callback(selections.value)
@@ -248,5 +283,5 @@ function handlePageChange(index: number) {
   emit('pageChange', index)
 }
 
-defineExpose({ openEdit: handleEdit })
+defineExpose({ openEdit: handleEdit, openDetail: handleDetail, closeForm })
 </script>

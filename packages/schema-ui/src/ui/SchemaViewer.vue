@@ -1,54 +1,36 @@
 <template>
-  <SchemaPage
-    ref="schemaPageRef"
-    :schemas="schemas"
-    :models="crud?.getModels() || []"
-    :pagination="pagination"
-    :loading="searching"
-    :size="size"
-    :title="title"
-    :formMode="formMode"
-    :showHeader="showHeader"
-    :showSearch="showSearch"
-    :showToolbar="showToolbar"
-    :showPagination="showPagination"
-    :readonly="readonly"
-    :searchActions="searchActionList"
-    :rowActions="rowActionList"
-    :batchActions="batchActionList"
-    :formActions="formActionList"
-    :gridProps="gridProps"
-    :formProps="formProps"
-    :presetQuery="presetQuery"
-    @search="handleSearch"
-    @create="handleCreate"
-    @edit="handleEdit"
-    @delete="handleDelete"
-    @pageChange="handlePageChange"
-    @sortChange="handleSortChange"
-    @selectionChange="handleSelectionChange"
-    @formSubmit="handleFormSubmit"
-  >
-    <template #searchform="{ model, schema }">
-      <slot name="searchform" :model="model" :schema="schema" />
-    </template>
-    <template #gridview="{ model, schema }">
-      <slot name="gridview" :model="model" :schema="schema" />
-    </template>
-    <template #crudform="{ model, schema }">
-      <slot name="crudform" :model="model" :schema="schema" />
-    </template>
-    <template #headerleft>
-      <slot name="headerleft" />
-    </template>
-    <template #headerright>
-      <slot name="headerright" />
-    </template>
-  </SchemaPage>
+  <template v-if="isReady">
+    <SchemaPage ref="schemaPageRef" :schemas="schemas" :models="crud?.getModels() || []" :pagination="pagination"
+      :loading="searching" :size="size" :title="title" :formMode="formMode" :showHeader="showHeader"
+      :showSearch="showSearch" :showToolbar="showToolbar" :showPagination="showPagination" :readonly="readonly"
+      :searchActions="searchActionList" :rowActions="rowActionList" :batchActions="batchActionList"
+      :formActions="formActionList" :gridProps="gridProps" :formProps="formProps" :presetQuery="presetQuery"
+      @search="handleSearch" @create="handleCreate" @delete="handleDelete"
+      @pageChange="handlePageChange" @sortChange="handleSortChange" @selectionChange="handleSelectionChange"
+      @formSubmit="handleFormSubmit">
+      <template #searchform="{ model, schema }">
+        <slot name="searchform" :model="model" :schema="schema" />
+      </template>
+      <template #gridview="{ model, schema }">
+        <slot name="gridview" :model="model" :schema="schema" />
+      </template>
+      <template #crudform="{ model, schema }">
+        <slot name="crudform" :model="model" :schema="schema" />
+      </template>
+      <template #headerleft>
+        <slot name="headerleft" />
+      </template>
+      <template #headerright>
+        <slot name="headerright" />
+      </template>
+    </SchemaPage>
+  </template>
+  <template v-else></template>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import type { Schema, Model, Action as ActionType, CRUDOptions, Scenario } from '../core/types'
 import { CRUD } from '../runtime/crud'
 import { useSchemaUI } from '../runtime/useSchemaUI'
@@ -151,6 +133,12 @@ const rowActionList = computed((): ActionType[] => {
   if (props.rowActions.length > 0) return props.rowActions
   return [
     {
+      name: 'view',
+      label: t('action.view'),
+      type: 'info',
+      asyncCallback: async (model) => handleView(model),
+    },
+    {
       name: 'edit',
       label: t('action.edit'),
       type: 'success',
@@ -193,6 +181,7 @@ const formActionList = computed((): ActionType[] => {
         } else {
           await crud.value!.updateModel(model)
         }
+        schemaPageRef.value?.closeForm()
       },
     },
   ]
@@ -269,6 +258,21 @@ function handleCreate() {
   // SchemaPage handles dialog display
 }
 
+async function handleView(model: Model) {
+  try {
+    const pk = crud.value!.findModelPrimaryKey(model)
+    if (pk !== undefined && pk !== null && pk !== '') {
+      const detail = await crud.value!.getModel(String(pk))
+      schemaPageRef.value?.openDetail(detail)
+    } else {
+      schemaPageRef.value?.openDetail(model)
+    }
+  } catch (e) {
+    console.error('Failed to fetch detail:', e)
+    schemaPageRef.value?.openDetail(model)
+  }
+}
+
 async function handleEdit(model: Model) {
   try {
     const pk = crud.value!.findModelPrimaryKey(model)
@@ -285,7 +289,15 @@ async function handleEdit(model: Model) {
 }
 
 function handleDelete(model: Model) {
-  crud.value!.deleteModel(model).catch((e) => console.error('Delete failed:', e))
+  ElMessageBox.confirm('确认删除该数据?', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+    .then(() => {
+      crud.value!.deleteModel(model).catch((e) => console.error('Delete failed:', e))
+    })
+    .catch(() => {})
 }
 
 function handlePageChange(index: number) {

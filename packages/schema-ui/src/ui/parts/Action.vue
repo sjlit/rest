@@ -1,12 +1,6 @@
 <template>
-  <el-button
-    :type="action.type || 'default'"
-    :size="action.size || 'small'"
-    :round="action.round"
-    :icon="action.icon"
-    :loading="loading"
-    @click="handleClick"
-  >
+  <el-button :type="action.type || 'default'" :size="action.size || 'default'" :round="action.round" :icon="action.icon"
+    :loading="loading" @click="handleClick">
     {{ action.label }}
   </el-button>
 </template>
