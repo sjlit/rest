@@ -170,10 +170,10 @@ func TestIntegrationOpenAPIEndpoint(t *testing.T) {
 	}
 
 	tr := &testRouter{}
-	userResource := NewResource(userModel,
-		WithRouter[IntegUser](tr),
-		WithPrefix[IntegUser]("/api/v1"),
-	)
+	userResource := NewResource(userModel, ResourceConfig{
+		Router: tr,
+		Prefix: "/api/v1",
+	})
 	userResource.Register()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/integration/user/openapi.json", nil)
@@ -224,10 +224,10 @@ func TestIntegrationOpenAPIDisabledByDefault(t *testing.T) {
 	}
 
 	tr := &testRouter{}
-	userResource := NewResource(userModel,
-		WithRouter[IntegUser](tr),
-		WithPrefix[IntegUser]("/api/v1"),
-	)
+	userResource := NewResource(userModel, ResourceConfig{
+		Router: tr,
+		Prefix: "/api/v1",
+	})
 	userResource.Register()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/integration/user/openapi.json", nil)
