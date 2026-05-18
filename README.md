@@ -144,6 +144,34 @@ model.Search(ctx, offset, limit, queryBuilder)
 
 ---
 
+## HTTP Resource
+
+将 `Model[T]` 包装为 HTTP Resource，自动生成 RESTful 路由：
+
+```go
+model, _ := rest.NewModel[User](rest.WithDB(db), rest.WithModuleName("user"))
+
+userResource := rest.NewResource(model, rest.ResourceConfig{
+    Router:    router,         // 路由引擎
+    Prefix:    "/api/v1",      // URL 前缀
+    Formatter: formatter,      // 可选：数据格式化器
+})
+userResource.Register() // 自动注册 Create / Update / Delete / Detail / Search / Export / OpenAPI 路由
+```
+
+`ResourceConfig` 字段：
+
+| 字段 | 说明 |
+|------|------|
+| `Router` | 路由引擎（需实现 `Router` 接口） |
+| `Prefix` | API URL 前缀 |
+| `Responder` | 自定义响应处理器 |
+| `Formatter` | 数据格式化器 |
+| `TenantResolve` | 多租户解析函数 |
+| `UserResolve` | 用户解析函数 |
+
+---
+
 ## 生命周期钩子
 
 支持注册式（非侵入式）生命周期钩子，**全局 any 注册**（所有模型共享）与**局部泛型注册**（单实例类型安全）双层设计。
