@@ -152,9 +152,9 @@ function handlePageChange(index: number) {
 
 function handleFormSubmit(model: Model, scenario: string) {
   if (scenario === 'create') {
-    fetch('/rest/admin', { method: 'POST', body: JSON.stringify(model) })
+    fetch('/rest/user/admin', { method: 'POST', body: JSON.stringify(model) })
   } else {
-    fetch(`/rest/admin/${model.id}`, { method: 'PUT', body: JSON.stringify(model) })
+    fetch(`/rest/user/admin/${model.id}`, { method: 'PUT', body: JSON.stringify(model) })
   }
 }
 
@@ -176,9 +176,7 @@ loadSchemas()
 | `hasPermission` | `(permission: string) => boolean` | 否 | 权限检查函数 |
 | `router` | `{ push: (to: any) => void }` | 否 | 路由对象，用于页面跳转 |
 | `i18n` | `{ t: (key: string, ...args: any[]) => string }` | 否 | 国际化翻译函数 |
-| `defaultPageSize` | `number` | 否 | 默认分页大小（默认 15） |
 | `apiPrefix` | `string` | 否 | API 路由前缀（默认 `'rest'`） |
-| `transformRequest` | `(config: any) => any` | 否 | 请求转换函数 |
 
 ### useSchemaUI
 
@@ -281,7 +279,7 @@ interface Action {
   round?: boolean
   size?: string
   permission?: string   // 所需权限标识
-  selection?: boolean   // 是否需要选中行
+  selection?: boolean   // 预留字段，当前未生效
   hidden?: boolean | ((model: Model) => boolean | Promise<boolean>)
   callback?: (model: Model, schemas?: Schema[], loading?: any) => void
   asyncCallback?: (model: Model, schemas?: Schema[], action?: Action) => Promise<void>
@@ -320,6 +318,7 @@ interface CRUDOptions {
   table?: string
   apiPrefix?: string
   schemas?: Schema[] | Record<string, Schema>
+  httpClient: SchemaUIConfig['httpClient'] // 必须，用于 HTTP 请求
 }
 ```
 
@@ -389,7 +388,7 @@ LiveTypeCascader   = 'cascader'
 ```typescript
 import { Scenarios } from '@ace/schema-ui'
 
-const scenarios = Scenarios.from(['create;update;list'])
+const scenarios = Scenarios.from('create;update;list')
 scenarios.has('create')  // true
 scenarios.has('delete')  // false
 ```
@@ -401,7 +400,7 @@ scenarios.has('delete')  // false
 ```typescript
 import { encode, decode } from '@ace/schema-ui'
 
-// encode: Date -> ISO string
+// encode: Date -> 格式字符串（YYYY-MM-DD HH:mm:ss）
 const submitModel = encode(model, schemas, 'create')
 
 // decode: string -> number/boolean
@@ -409,7 +408,7 @@ const formModel = decode(rawModel, schemas, 'create')
 ```
 
 转换规则：
-- **encode**：`datetime/date/timestamp/time` 格式的 `Date` 对象转为 ISO 字符串
+- **encode**：`datetime/date/timestamp/time` 格式的 `Date` 对象转为 `YYYY-MM-DD HH:mm:ss` 格式字符串
 - **decode**：`integer` 类型的字符串转为整数；`float/double/decimal` 转为浮点数；`boolean` 格式转为布尔值
 
 ### getModelValue / getModelLabel
@@ -473,7 +472,7 @@ const cleanQuery = clearSearchModel(searchModel, schemas)
 | `title` | `string` | `''` | 页面标题 |
 | `apiPrefix` | `string` | `''` | API 前缀，默认使用全局配置 |
 | `config` | `Partial<CRUDOptions>` | `{}` | CRUD 配置覆盖 |
-| `size` | `string` | - | Element Plus 组件尺寸 |
+| `size` | `string` | - | 预留字段，当前未生效 |
 | `formMode` | `'drawer' \| 'dialog'` | `'dialog'` | 表单弹窗模式 |
 | `showHeader` | `boolean` | `true` | 是否显示头部 |
 | `showSearch` | `boolean` | `true` | 是否显示搜索栏 |
@@ -564,7 +563,7 @@ function onReady(crud: CRUD) {
 | `models` | `Model[]` | - | 数据列表 |
 | `pagination` | `Pagination` | `{ index: 1, size: 15, totalCount: 0 }` | 分页信息 |
 | `loading` | `boolean` | `false` | 加载状态 |
-| `size` | `string` | - | 组件尺寸 |
+| `size` | `string` | - | 预留字段，当前未生效 |
 | `title` | `string` | - | 页面标题 |
 | `formMode` | `'drawer' \| 'dialog'` | `'dialog'` | 表单弹窗模式 |
 | `showHeader` | `boolean` | `true` | 是否显示头部 |
@@ -627,7 +626,7 @@ function onReady(crud: CRUD) {
 | `schemas` | `Schema[]` | - | Schema 定义数组 |
 | `models` | `Model[]` | - | 数据列表 |
 | `scenario` | `string` | `'list'` | 场景 |
-| `size` | `string` | - | 表格尺寸 |
+| `size` | `string` | - | 预留字段，当前未生效 |
 | `selection` | `boolean` | `true` | 是否显示多选列 |
 | `actions` | `Action[]` | `[]` | 行操作按钮 |
 | `gridProps` | `Record<string, any>` | `{}` | 传递给 `el-table` 的属性 |
@@ -640,7 +639,6 @@ function onReady(crud: CRUD) {
 |-------|------|------|
 | `selection` | `(selection: any[])` | 多选变化 |
 | `sort` | `{ column, order }` | 排序变化 |
-| `dragend` | - | 拖拽结束 |
 
 #### Slots
 
@@ -661,7 +659,7 @@ Schema 驱动的表单组件，支持网格布局、行内布局、响应式断�
 | `schemas` | `Schema[]` | - | Schema 定义数组 |
 | `model` | `Model` | `undefined` | 初始模型数据 |
 | `scenario` | `string` | `'create'` | 场景 |
-| `size` | `string` | - | 组件尺寸 |
+| `size` | `string` | - | 预留字段，当前未生效 |
 | `labelWidth` | `string` | `''` | 标签宽度 |
 | `inline` | `boolean` | `false` | 行内表单模式 |
 | `grid` | `boolean` | `false` | 网格布局模式 |
@@ -757,9 +755,9 @@ CRUD 类使用 `pluralize` 库根据 `module`、`table` 和 `scenario` 自动构
 | `create` | `/rest/user/admin` |
 | `update` | `/rest/user/admin/123` |
 | `delete` | `/rest/user/admin/123` |
-| `get` | `/rest/user/admin/123` |
+| `get` | `/rest/user/admin/detail/123` |
 | `search` | `/rest/user/admins` |
-| `export` | `/rest/user/admin-export` |
+| `export` | `/rest/user/admin/export` |
 
 Schema 加载 URI：
 - 有 module：`GET /rest/schema/{module}/{table}`
@@ -906,6 +904,7 @@ const crud = new CRUD({
 
 async function loadData() {
   loading.value = true
+  await crud.initialize()
   const result = await crud.searchModel()
   models.value = result
   pagination.value = { ...crud.pagination }

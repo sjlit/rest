@@ -71,7 +71,7 @@ interface Schema {
 
 | 值 | 说明 | 渲染控件 |
 |----|------|----------|
-| `text` | 单行文本 | `el-input` |
+| `text` | 文本（搜索场景单行，表单场景多行） | `el-input` / `el-input type="textarea"` |
 | `textarea` | 多行文本 | `el-input type="textarea"` |
 | `password` | 密码 | `el-input show-password` |
 | `dropdown` | 下拉选择 | `el-select` |
@@ -85,6 +85,8 @@ interface Schema {
 | `file` | 文件上传 | `el-upload` |
 | `integer` | 整数输入 | `el-input v-model.number` |
 | `number` | 数字输入 | `el-input v-model.number` |
+| `percentage` | 百分比 | `el-input`（输入）/ 自动格式化显示 |
+| `duration` | 持续时间（秒） | `el-input`（输入）/ `HH:mm:ss` 格式化显示 |
 
 ### primary_key
 
@@ -135,6 +137,8 @@ interface Schema {
 | `string` | `time` | TIME | 时间选择器 |
 | `string` | `timestamp` | TIMESTAMP | 日期时间选择器 |
 | `string` | `file` | VARCHAR | 文件上传 |
+| `float` | `percentage` | DECIMAL | 数字输入框（自动格式化显示） |
+| `integer` | `duration` | INT | 数字输入框（自动格式化为 HH:mm:ss） |
 
 ---
 
@@ -192,7 +196,7 @@ interface SchemaRule {
   unique: boolean       // 是否唯一
   required: string[]    // 必填场景列表
   regular?: string      // 正则表达式
-  safe?: boolean        // 是否安全检查
+  safe?: boolean        // 安全字段标记。true 时跳过所有表单校验规则生成
 }
 ```
 
@@ -314,7 +318,7 @@ interface SchemaRule {
 }
 ```
 
-`color` 用于表格中的标签颜色显示。
+`color` 用于表格中的标签颜色显示。注意：只有当**所有枚举值都设置了 `color`** 时，才会以 tag 样式渲染；否则按普通文本显示。
 
 ### sort
 
@@ -545,7 +549,7 @@ DELETE /{apiPrefix}/{module}/{singularTable}/{id}
 **请求：**
 
 ```
-GET /{apiPrefix}/{module}/{singularTable}-export
+GET /{apiPrefix}/{module}/{singularTable}/export
 ```
 
 **响应：** CSV 文件流

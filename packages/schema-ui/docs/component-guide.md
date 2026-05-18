@@ -35,9 +35,9 @@ import { SchemaViewer } from '@ace/schema-ui'
   ├─── 创建 CRUD 实例
   ├─── 调用 initialize() 加载 schema
   ├─── 拉取 live 数据
-  ├─── 触发 ready 事件
-  ├─── 应用 presetQuery
+  ├─── 应用 presetQuery（附加到查询参数，但不在搜索表单中显示）
   ├─── 应用 defaultSort
+  ├─── 触发 ready 事件
   └─── 如 autoFetch=true，自动搜索数据
 ```
 
@@ -161,7 +161,7 @@ import { SchemaViewer } from '@ace/schema-ui'
   module="user"
   table="admin"
   :gridProps="{ stripe: true, height: '500px' }"
-  :formProps="{ labelPosition: 'top' }"
+  :formProps="{ labelWidth: '0' }"
 />
 ```
 
@@ -198,6 +198,8 @@ function onReady(crud: CRUD) {
 ## SchemaPage 手动编排
 
 `SchemaPage` 是纯展示组件，不发送任何 HTTP 请求。所有数据通过 props 传入，所有操作通过 events 通知父组件。
+
+除了表单弹窗/抽屉外，`SchemaPage` 还内置了详情查看功能（通过 `el-descriptions` 渲染），可通过 `openDetail` 方法打开。
 
 ### 何时使用 SchemaPage
 
@@ -252,7 +254,7 @@ async function handleSearch(model: Model) {
   const query = new URLSearchParams({
     ...model,
     page: String(pagination.value.index),
-    pagesize: String(pagination.value.size),
+    page_size: String(pagination.value.size),
   })
   const res = await fetch(`/rest/user/admins?${query}`)
   const data = await res.json()
@@ -293,6 +295,35 @@ async function handleDelete(model: Model) {
 }
 
 loadSchemas()
+</script>
+```
+
+### 暴露方法
+
+`SchemaPage` 通过 `ref` 暴露了以下方法，供父组件调用：
+
+| 方法 | 参数 | 说明 |
+|------|------|------|
+| `openEdit(model)` | `Model` | 打开编辑弹窗/抽屉 |
+| `openDetail(model)` | `Model` | 打开详情弹窗/抽屉 |
+| `closeForm()` | - | 关闭表单弹窗/抽屉 |
+
+```vue
+<template>
+  <SchemaPage ref="pageRef" :schemas="schemas" :models="models" ... />
+</template>
+
+<script setup>
+const pageRef = ref(null)
+
+// 打开编辑
+pageRef.value?.openEdit(model)
+
+// 打开详情
+pageRef.value?.openDetail(model)
+
+// 关闭表单
+pageRef.value?.closeForm()
 </script>
 ```
 
@@ -534,7 +565,7 @@ async function handleSubmit() {
 自定义表格单元格内容：
 
 ```vue
-<SchemaViewer module="user" user="admin">
+<SchemaViewer module="user" table="admin">
   <template #gridview="{ model, schema }">
     <!-- 头像 -->
     <el-avatar
@@ -738,7 +769,7 @@ const rowActions: Action[] = [
 
 ### 批量操作
 
-批量操作接收选中项数组：
+批量操作接收选中项数组。注意：批量操作**只支持 `callback`**，不支持 `asyncCallback`。
 
 ```typescript
 const batchActions: Action[] = [
@@ -761,8 +792,8 @@ const batchActions: Action[] = [
     name: 'batchUpdateStatus',
     label: '批量更新状态',
     type: 'primary',
-    asyncCallback: async (selections) => {
-      await updateStatus(selections.map(s => s.id), 'active')
+    callback: (selections) => {
+      updateStatus(selections.map(s => s.id), 'active')
     },
   },
 ]

@@ -354,7 +354,7 @@ const models = await crud.searchModel()
 
 **请求参数：**
 - `page`: 当前页码
-- `pagesize`: 每页条数
+- `page_size`: 每页条数
 - `sort`: 排序字段（前缀 `-` 表示降序）
 - `__format`: `'both'`（固定值）
 - 所有 `queryParams` 中的参数
@@ -412,9 +412,9 @@ await crud.exportModels()
 | `create` | `/{prefix}/{module}/{singular}` | `/rest/user/admin` |
 | `update` | `/{prefix}/{module}/{singular}/{pk}` | `/rest/user/admin/123` |
 | `delete` | `/{prefix}/{module}/{singular}/{pk}` | `/rest/user/admin/123` |
-| `get` | `/{prefix}/{module}/{singular}/{pk}` | `/rest/user/admin/123` |
+| `get` | `/{prefix}/{module}/{singular}/detail/{pk}` | `/rest/user/admin/detail/123` |
 | `search` | `/{prefix}/{module}/{plural}` | `/rest/user/admins` |
-| `export` | `/{prefix}/{module}/{singular}-export` | `/rest/user/admin-export` |
+| `export` | `/{prefix}/{module}/{singular}/export` | `/rest/user/admin/export` |
 
 ### 特殊情况
 
@@ -486,7 +486,7 @@ async function update() {
 }
 
 async function remove() {
-  await crud.deleteModel(1)
+  await crud.deleteModel('1')
   console.log('删除成功')
 }
 
@@ -580,28 +580,29 @@ import type { Model } from '@ace/schema-ui'
 class OrderCRUD extends CRUD {
   // 审批订单
   async approveOrder(orderId: string): Promise<Model> {
-    const res = await this.opts.httpClient.post(
-      `${this.__buildUri('update', orderId)}/approve`
-    )
-    return this.__refreshModel(orderId)
+    const uri = this.getSchemas().length > 0
+      ? `/${this.opts.apiPrefix}/${this.opts.module}/${this.opts.table}/${orderId}/approve`
+      : ''
+    const res = await this.opts.httpClient.post(uri)
+    return res
   }
   
   // 取消订单
   async cancelOrder(orderId: string, reason: string): Promise<Model> {
-    const res = await this.opts.httpClient.post(
-      `${this.__buildUri('update', orderId)}/cancel`,
-      { reason }
-    )
-    return this.__refreshModel(orderId)
+    const uri = this.getSchemas().length > 0
+      ? `/${this.opts.apiPrefix}/${this.opts.module}/${this.opts.table}/${orderId}/cancel`
+      : ''
+    const res = await this.opts.httpClient.post(uri, { reason })
+    return res
   }
   
   // 发货
   async shipOrder(orderId: string, trackingNumber: string): Promise<Model> {
-    const res = await this.opts.httpClient.post(
-      `${this.__buildUri('update', orderId)}/ship`,
-      { tracking_number: trackingNumber }
-    )
-    return this.__refreshModel(orderId)
+    const uri = this.getSchemas().length > 0
+      ? `/${this.opts.apiPrefix}/${this.opts.module}/${this.opts.table}/${orderId}/ship`
+      : ''
+    const res = await this.opts.httpClient.post(uri, { tracking_number: trackingNumber })
+    return res
   }
 }
 
@@ -621,8 +622,11 @@ await orderCrud.shipOrder('123', 'SF123456')
 
 ```typescript
 class CustomCRUD extends CRUD {
-  // 覆盖 URI 构建规则
-  protected __buildModelUri(
+  // 注意：__buildModelUri 是 private 方法，无法直接覆盖。
+  // 如需自定义 URI，建议在子类中重写 searchModel/createModel/updateModel/deleteModel 等方法，
+  // 或在构造时通过外部配置控制路径。
+  // 以下为示例思路（非直接覆盖）：
+  private __customBuildUri(
     moduleName: string,
     tableName: string,
     scenario: string,
@@ -640,7 +644,9 @@ class CustomCRUD extends CRUD {
       case 'delete':
         return `/api/${moduleName}/${tableName}/remove/${pk}`
       default:
-        return super.__buildModelUri(moduleName, tableName, scenario, primaryKey)
+        // 注意：super.__buildModelUri 无法调用（private），
+        // 实际开发中应手动拼接路径或避免继承方式自定义 URI
+        return `/api/${moduleName}/${tableName}/${scenario}`
     }
   }
 }
