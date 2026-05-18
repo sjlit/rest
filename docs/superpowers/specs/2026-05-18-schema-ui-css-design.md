@@ -56,12 +56,16 @@ src/
   --su-border: var(--el-border-color, #dcdfe6);
   --su-border-light: var(--el-border-color-lighter, #ebeef5);
 
-  /* Elevation —— 极微妙的阴影，提升卡片层次感 */
-  --su-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 6px rgba(0, 0, 0, 0.02);
-  --su-shadow-hover: 0 2px 8px rgba(0, 0, 0, 0.06), 0 2px 12px rgba(0, 0, 0, 0.04);
+  /* Elevation —— 基于文字色的半透明阴影，深浅主题均有效 */
+  --su-shadow-color: color-mix(in srgb, var(--su-text-primary) 4%, transparent);
+  --su-shadow-color-light: color-mix(in srgb, var(--su-text-primary) 2%, transparent);
+  --su-shadow: 0 1px 2px var(--su-shadow-color), 0 1px 6px var(--su-shadow-color-light);
+  --su-shadow-hover: 0 2px 8px color-mix(in srgb, var(--su-text-primary) 6%, transparent),
+    0 2px 12px color-mix(in srgb, var(--su-text-primary) 4%, transparent);
 
-  /* Motion */
-  --su-transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Motion —— 按属性分层 */
+  --su-transition-fast: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --su-transition-base: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 ```
 
@@ -85,16 +89,23 @@ src/
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: var(--su-space-2);
   padding: var(--su-padding) var(--su-space-5);
   background: var(--su-bg);
   border-radius: var(--su-radius);
   border: 1px solid var(--su-border-light);
   box-shadow: var(--su-shadow);
-  transition: var(--su-transition);
+  transition: var(--su-transition-base);
 }
 
 .schema-page-header:hover {
   box-shadow: var(--su-shadow-hover);
+}
+
+.schema-page-header:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 2px;
 }
 
 .header-left h3 {
@@ -124,7 +135,13 @@ src/
   border-radius: var(--su-radius);
   border: 1px solid var(--su-border-light);
   box-shadow: var(--su-shadow);
-  transition: var(--su-transition);
+  transition: var(--su-transition-base);
+}
+
+/* Loading mask 圆角适配 */
+.schema-page-search > .el-loading-mask,
+.schema-page-grid > .el-loading-mask {
+  border-radius: var(--su-radius);
 }
 
 .schema-page-toolbar {
@@ -134,11 +151,18 @@ src/
   padding: var(--su-space-2) var(--su-space-4);
 }
 
-.schema-page-grid .el-pagination {
+/* 分页区域使用 wrapper class 控制布局，不直接覆盖 el-pagination */
+.schema-page-pagination {
   margin-top: var(--su-gap);
   padding-top: var(--su-space-3);
   border-top: 1px solid var(--su-border-light);
+  display: flex;
   justify-content: flex-end;
+}
+
+/* Empty 状态在卡片内的居中协调 */
+.schema-page-grid .el-empty {
+  padding: var(--su-space-6) 0;
 }
 ```
 
@@ -219,6 +243,24 @@ src/
   flex: 1;
   font-size: var(--el-font-size-base, 14px);
 }
+
+/* 极小屏幕：label/value 上下堆叠，避免拥挤 */
+@media (max-width: 375px) {
+  .mobile-preview-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--su-space-1);
+  }
+
+  .mobile-preview-label {
+    max-width: none;
+    min-width: auto;
+  }
+
+  .mobile-preview-value {
+    text-align: left;
+  }
+}
 ```
 
 ### Cell（cell.css）
@@ -240,13 +282,18 @@ src/
   font-size: var(--el-font-size-small, 12px);
   font-weight: 500;
   line-height: 1.4;
-  transition: var(--su-transition);
+  transition: var(--su-transition-base);
   cursor: default;
   user-select: none;
 }
 
 .schema-cell-tag:hover {
-  filter: brightness(0.95);
+  opacity: 0.85;
+}
+
+.schema-cell-tag:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 2px;
 }
 ```
 
@@ -280,6 +327,13 @@ Vite lib 模式构建时会自动提取所有 CSS 到 `dist/schema-ui.css`。使
 |------|------|
 | 独立 CSS 文件 | 组件各自 import 自己的样式，保持模块化；Vite 自动合并提取 |
 | Element Plus 变量 fallback | 所有颜色、圆角、字号都 fallback 到 `--el-*`，保证主题一致性 |
-| 极淡阴影 | `box-shadow` 值刻意压得很低，只提供空间层次，不喧宾夺主 |
-| 统一 cubic-bezier | `0.2s cubic-bezier(0.4, 0, 0.2, 1)` 比默认 `ease` 更精致 |
-| 分页/按钮区顶边框 | 用细线分隔区域，形成清晰的段落感 |
+| 自适应阴影 | 使用 `color-mix(in srgb, var(--su-text-primary) X%, transparent)` 生成阴影，深浅主题均有效 |
+| 过渡分层 | `opacity` 用 `0.15s`，其他属性用 `0.2s`，统一 `cubic-bezier(0.4, 0, 0.2, 1)` |
+| 分页 wrapper class | 用 `.schema-page-pagination` 包裹 pagination 控制布局，不直接覆盖 `.el-pagination` |
+| loading mask 圆角 | `.schema-page-search > .el-loading-mask` 和 `.schema-page-grid > .el-loading-mask` 继承卡片圆角 |
+| 移动端响应式 | 默认左右排列，`< 375px` 时 label/value 上下堆叠 |
+| focus-visible | 可交互元素（header、cell-tag）提供 `outline: 2px solid var(--el-color-primary)` |
+| 表单/分页区顶边框 | 用细线分隔区域，形成清晰的段落感 |
+| empty 状态协调 | `.schema-page-grid .el-empty { padding: var(--su-space-6) 0; }` 提升视觉平衡 |
+| header 防溢出 | `flex-wrap: wrap` + `row-gap` 防止右侧按钮过多时挤压标题 |
+| cell-tag hover | 使用 `opacity: 0.85` 替代 `brightness`，避免深浅主题效果相反 |
