@@ -1,3 +1,22 @@
+@import './variables.scss';
+
+.schema-page-grid {
+  th.el-table__cell {
+    color: var(--su-text-color-primary);
+    background-color: #f9fbfd;
+  }
+
+  td.el-table__cell {
+    font-size: .82rem;
+  }
+
+  .cell {
+    a {
+      color: var(--su-text-color-link);
+    }
+  }
+}
+
 .schema-grid-actions {
   display: flex;
   gap: var(--su-space-2);

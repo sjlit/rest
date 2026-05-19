@@ -1,9 +1,12 @@
+@import './variables.scss';
+
 .schema-form {
   padding: var(--su-padding);
 
   .el-form--inline {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     justify-content: flex-start;
 
     .el-form-item__label {
@@ -29,21 +32,30 @@
   }
 
   .el-select {
-    width: var(--form-control-width);
+    width: var(--su-form-control-width);
 
     .el-select__placeholder {
       &.is-transparent {
-        font-size: var(--placeholder-text-size);
-        color: var(--placeholder-text-color);
+        font-size: var(--su-placeholder-text-size);
+        color: var(--su-placeholder-text-color);
       }
     }
   }
 
   .el-input {
-    width: var(--form-control-width);
+    --el-input-border-color: var(--su-form-control-border-color);
+    --el-input-focus-border: var(--su-form-control-border-color);
+    width: var(--su-form-control-width);
 
     &.round {
       --el-input-border-radius: 30px;
+    }
+
+    .el-input__inner {
+      &::placeholder {
+        font-size: var(--su-placeholder-text-size);
+        color: var(--su-placeholder-text-color);
+      }
     }
 
 
@@ -77,13 +89,4 @@
       min-width: 90%;
     }
   }
-}
-
-.schema-form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--su-space-2);
-  margin-top: var(--su-space-4);
-  padding-top: var(--su-space-3);
-  border-top: 1px solid var(--su-border-light);
 }

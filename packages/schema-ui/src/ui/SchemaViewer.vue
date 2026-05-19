@@ -5,9 +5,8 @@
       :showSearch="showSearch" :showToolbar="showToolbar" :showPagination="showPagination" :readonly="readonly"
       :searchActions="searchActionList" :rowActions="rowActionList" :batchActions="batchActionList"
       :formActions="formActionList" :gridProps="gridProps" :formProps="formProps" :presetQuery="presetQuery"
-      @search="handleSearch" @create="handleCreate" @delete="handleDelete"
-      @pageChange="handlePageChange" @sortChange="handleSortChange" @selectionChange="handleSelectionChange"
-      @formSubmit="handleFormSubmit">
+      @search="handleSearch" @create="handleCreate" @delete="handleDelete" @pageChange="handlePageChange"
+      @sortChange="handleSortChange" @selectionChange="handleSelectionChange" @formSubmit="handleFormSubmit">
       <template #searchform="{ model, schema }">
         <slot name="searchform" :model="model" :schema="schema" />
       </template>
@@ -135,18 +134,21 @@ const rowActionList = computed((): ActionType[] => {
     {
       name: 'view',
       label: t('action.view'),
+      icon: 'View',
       type: 'info',
       asyncCallback: async (model) => handleView(model),
     },
     {
       name: 'edit',
       label: t('action.edit'),
+      icon: 'EditPen',
       type: 'success',
       asyncCallback: async (model) => handleEdit(model),
     },
     {
       name: 'delete',
       label: t('action.delete'),
+      icon: 'Delete',
       type: 'danger',
       callback: (model) => handleDelete(model),
     },
@@ -297,7 +299,7 @@ function handleDelete(model: Model) {
     .then(() => {
       crud.value!.deleteModel(model).catch((e) => console.error('Delete failed:', e))
     })
-    .catch(() => {})
+    .catch(() => { })
 }
 
 function handlePageChange(index: number) {

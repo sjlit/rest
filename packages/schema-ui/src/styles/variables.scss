@@ -32,4 +32,15 @@
   /* Motion —— layered transitions */
   --su-transition-fast: opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --su-transition-base: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /** */
+  --su-text-color-primary: #213547;
+  --su-text-color-muted: #95aac9;
+  --su-box-shadow: 0px 0px 30px 8px rgba(0, 0, 0, .046);
+  --su-placeholder-text-color: #c1ccdb;
+  --su-placeholder-text-size: .68rem;
+  --su-form-control-border-color: #d2ddec;
+  --su-form-control-width: 210px;
+  --su-text-color-available: #00d97e;
+  --su-text-color-link: #0067b8
 }
