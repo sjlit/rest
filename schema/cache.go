@@ -98,7 +98,7 @@ func (c *Cache) GetSchemas(ctx context.Context, moduleName, tableName string) ([
 			if c.ttl > 0 && time.Since(ent.cachedAt) > c.ttl {
 				ok = false
 			} else {
-				// Double-check: another goroutine refreshed while we waited
+				// Double-check: another goroutine may have refreshed while we waited
 				var lastUpdated int64
 				err := c.db.Model(&Schema{}).
 					Select("COALESCE(MAX(updated_at), 0)").
@@ -108,7 +108,6 @@ func (c *Cache) GetSchemas(ctx context.Context, moduleName, tableName string) ([
 					c.mu.Unlock()
 					return ent.schemas, nil
 				}
-				// Timestamp mismatch or error: treat as miss
 				ok = false
 			}
 		}
