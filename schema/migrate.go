@@ -509,5 +509,6 @@ func AutoMigrate(ctx context.Context, db *gorm.DB, model any, moduleName string)
 	if len(models) > 0 {
 		err = gorm.G[Schema](db).CreateInBatches(ctx, &models, 50)
 	}
+	InvalidateCache(moduleName, tableName)
 	return
 }

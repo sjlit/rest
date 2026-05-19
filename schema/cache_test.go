@@ -340,3 +340,47 @@ func TestDefaultCacheIntegration(t *testing.T) {
 		t.Fatalf("expected 1 visible schema, got %d", len(visible))
 	}
 }
+
+func TestAutoMigrateInvalidatesCache(t *testing.T) {
+	// Ensure clean state
+	defaultCache = nil
+	defer func() { defaultCache = nil }()
+
+	db := setupCacheTestDB(t)
+	EnableCache(db)
+
+	type TestUser struct {
+		ID   uint   `json:"id" gorm:"primarykey"`
+		Name string `json:"name"`
+	}
+
+	// First AutoMigrate populates cache
+	_, err := AutoMigrate(nil, db, &TestUser{}, "testmod")
+	if err != nil {
+		t.Fatalf("AutoMigrate error: %v", err)
+	}
+
+	// Populate cache manually to test invalidation
+	GetSchemas(nil, db, "testmod", "test_users")
+
+	defaultCache.mu.RLock()
+	_, ok := defaultCache.entries["testmod:test_users"]
+	defaultCache.mu.RUnlock()
+	if !ok {
+		t.Fatal("expected cache entry before second AutoMigrate")
+	}
+
+	// Second AutoMigrate should invalidate cache
+	_, err = AutoMigrate(nil, db, &TestUser{}, "testmod")
+	if err != nil {
+		t.Fatalf("AutoMigrate error: %v", err)
+	}
+
+	// Verify cache was invalidated
+	defaultCache.mu.RLock()
+	_, ok = defaultCache.entries["testmod:test_users"]
+	defaultCache.mu.RUnlock()
+	if ok {
+		t.Error("expected cache entry to be invalidated after AutoMigrate")
+	}
+}
