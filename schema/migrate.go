@@ -392,6 +392,10 @@ func parseFieldRelations(field *schema.Field) Relation {
 
 // GetSchemas 获取表字段
 func GetSchemas(ctx context.Context, db *gorm.DB, moduleName, tableName string) ([]Schema, error) {
+	if defaultCache != nil {
+		return defaultCache.GetSchemas(ctx, moduleName, tableName)
+	}
+
 	var (
 		err    error
 		values []Schema
@@ -408,6 +412,10 @@ func GetSchemas(ctx context.Context, db *gorm.DB, moduleName, tableName string) 
 }
 
 func GetVisibleSchemas(ctx context.Context, db *gorm.DB, moduleName, tableName, scenario string) ([]Schema, error) {
+	if defaultCache != nil {
+		return defaultCache.GetVisibleSchemas(ctx, moduleName, tableName, scenario)
+	}
+
 	schemas, err := GetSchemas(ctx, db, moduleName, tableName)
 	if err != nil {
 		return nil, err

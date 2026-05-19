@@ -1,10 +1,25 @@
 package schema
 
-import "errors"
+import (
+	"errors"
+
+	"gorm.io/gorm"
+)
 
 var (
 	ErrUnsupportType = errors.New("database type unsupported")
+	defaultCache     *Cache
 )
+
+func EnableCache(db *gorm.DB, opts ...CacheOption) {
+	defaultCache = NewCache(db, opts...)
+}
+
+func InvalidateCache(module, table string) {
+	if defaultCache != nil {
+		defaultCache.Invalidate(module, table)
+	}
+}
 
 type (
 	Schema struct {

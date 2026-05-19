@@ -290,3 +290,53 @@ func TestCacheGetVisibleSchemas(t *testing.T) {
 		t.Fatalf("expected 1 visible schema on cache hit, got %d", len(schemas2))
 	}
 }
+
+func TestDefaultCacheIntegration(t *testing.T) {
+	// Ensure clean state
+	defaultCache = nil
+	defer func() { defaultCache = nil }()
+
+	db := setupCacheTestDB(t)
+	db.Create(&Schema{ModuleName: "mod", TableName: "tbl", Column: "id", UpdatedAt: 1000, Scenarios: Scenarios{ScenarioList, ScenarioDetail}})
+
+	// Before enabling cache, direct query works
+	schemas, err := GetSchemas(nil, db, "mod", "tbl")
+	if err != nil {
+		t.Fatalf("GetSchemas error: %v", err)
+	}
+	if len(schemas) != 1 {
+		t.Fatalf("expected 1 schema, got %d", len(schemas))
+	}
+
+	// Enable cache
+	EnableCache(db)
+
+	// This call should populate cache
+	schemas2, err := GetSchemas(nil, db, "mod", "tbl")
+	if err != nil {
+		t.Fatalf("GetSchemas error: %v", err)
+	}
+	if len(schemas2) != 1 {
+		t.Fatalf("expected 1 schema, got %d", len(schemas2))
+	}
+
+	// Verify cache was populated
+	defaultCache.mu.RLock()
+	ent, ok := defaultCache.entries["mod:tbl"]
+	defaultCache.mu.RUnlock()
+	if !ok {
+		t.Fatal("expected defaultCache to have entry")
+	}
+	if len(ent.schemas) != 1 {
+		t.Errorf("expected 1 cached schema, got %d", len(ent.schemas))
+	}
+
+	// GetVisibleSchemas should also use cache
+	visible, err := GetVisibleSchemas(nil, db, "mod", "tbl", ScenarioList)
+	if err != nil {
+		t.Fatalf("GetVisibleSchemas error: %v", err)
+	}
+	if len(visible) != 1 {
+		t.Fatalf("expected 1 visible schema, got %d", len(visible))
+	}
+}
