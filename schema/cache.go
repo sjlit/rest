@@ -149,3 +149,17 @@ func (c *Cache) GetSchemas(ctx context.Context, moduleName, tableName string) ([
 
 	return ent.schemas, nil
 }
+
+func (c *Cache) GetVisibleSchemas(ctx context.Context, moduleName, tableName, scenario string) ([]Schema, error) {
+	schemas, err := c.GetSchemas(ctx, moduleName, tableName)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Schema, 0, len(schemas))
+	for _, row := range schemas {
+		if row.Scenarios.Has(scenario) {
+			result = append(result, row)
+		}
+	}
+	return result, nil
+}

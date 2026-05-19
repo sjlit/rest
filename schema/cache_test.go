@@ -253,3 +253,40 @@ func TestCacheGetSchemas_ConcurrentLoad(t *testing.T) {
 		t.Errorf("expected 1 schema, got %d", len(ent.schemas))
 	}
 }
+
+func TestCacheGetVisibleSchemas(t *testing.T) {
+	db := setupCacheTestDB(t)
+	c := NewCache(db)
+
+	// Insert records with different scenarios
+	db.Create(&Schema{
+		ModuleName: "mod", TableName: "tbl", Column: "id",
+		Scenarios: Scenarios{ScenarioList, ScenarioDetail},
+		UpdatedAt: 1000,
+	})
+	db.Create(&Schema{
+		ModuleName: "mod", TableName: "tbl", Column: "secret",
+		Scenarios: Scenarios{ScenarioCreate, ScenarioUpdate},
+		UpdatedAt: 1000,
+	})
+
+	schemas, err := c.GetVisibleSchemas(nil, "mod", "tbl", ScenarioList)
+	if err != nil {
+		t.Fatalf("GetVisibleSchemas error: %v", err)
+	}
+	if len(schemas) != 1 {
+		t.Fatalf("expected 1 visible schema, got %d", len(schemas))
+	}
+	if schemas[0].Column != "id" {
+		t.Errorf("column: want id, got %s", schemas[0].Column)
+	}
+
+	// Call again to verify cache hit path
+	schemas2, err := c.GetVisibleSchemas(nil, "mod", "tbl", ScenarioList)
+	if err != nil {
+		t.Fatalf("GetVisibleSchemas error: %v", err)
+	}
+	if len(schemas2) != 1 {
+		t.Fatalf("expected 1 visible schema on cache hit, got %d", len(schemas2))
+	}
+}
