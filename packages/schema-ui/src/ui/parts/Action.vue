@@ -1,12 +1,17 @@
 <template>
-  <el-button :type="action.type || 'default'" :size="action.size || 'default'" :round="action.round" :icon="action.icon"
+  <el-tooltip v-if="isComponentIcon" :content="action.label">
+    <el-icon class="action-icon" @click="handleClick">
+      <component :is="props.action.icon" />
+    </el-icon>
+  </el-tooltip>
+  <el-button v-else :type="action.type || 'default'" :size="action.size || 'default'" :round="action.round"
     :loading="loading" @click="handleClick">
     {{ action.label }}
   </el-button>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { Action as ActionType, Model } from '../../core/types'
 
 interface Props {
@@ -20,6 +25,8 @@ const emit = defineEmits<{
 }>()
 
 const loading = ref(false)
+
+const isComponentIcon = computed(() => props.action.icon !== undefined && props.action.icon !== null && typeof props.action.icon !== 'string')
 
 function handleClick() {
   if (props.action.hidden) {

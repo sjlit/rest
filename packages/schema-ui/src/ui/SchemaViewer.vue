@@ -35,6 +35,7 @@ import { CRUD } from '../runtime/crud'
 import { useSchemaUI } from '../runtime/useSchemaUI'
 import { clearSearchModel } from '../core/form'
 import { createDefaultTranslator } from '../core/i18n'
+import { Delete, EditPen, View } from '@element-plus/icons-vue'
 import SchemaPage from './SchemaPage.vue'
 
 interface Props {
@@ -134,21 +135,21 @@ const rowActionList = computed((): ActionType[] => {
     {
       name: 'view',
       label: t('action.view'),
-      icon: 'View',
+      icon: View,
       type: 'info',
       asyncCallback: async (model) => handleView(model),
     },
     {
       name: 'edit',
       label: t('action.edit'),
-      icon: 'EditPen',
+      icon: EditPen,
       type: 'success',
       asyncCallback: async (model) => handleEdit(model),
     },
     {
       name: 'delete',
       label: t('action.delete'),
-      icon: 'Delete',
+      icon: Delete,
       type: 'danger',
       callback: (model) => handleDelete(model),
     },

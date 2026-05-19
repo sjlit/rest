@@ -1,3 +1,5 @@
+import type { Component } from 'vue'
+
 export type Scenario = 'create' | 'update' | 'delete' | 'search' | 'list' | 'detail' | 'export'
 
 export interface SchemaRule {
@@ -99,7 +101,7 @@ export interface Action {
   name: string
   label: string
   type?: string
-  icon?: string
+  icon?: string | Component
   round?: boolean
   size?: string
   permission?: string

@@ -23,6 +23,11 @@
   justify-content: center;
   flex-wrap: wrap;
   align-items: center;
+
+  .el-icon {
+    cursor: pointer;
+    margin-right: var(--su-space-2);
+  }
 }
 
 .mobile-primary-label {
