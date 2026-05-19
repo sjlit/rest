@@ -216,6 +216,35 @@ func TestCacheGetSchemas_EmptyResult(t *testing.T) {
 	}
 }
 
+func TestCacheGetSchemas_RecordNotFound(t *testing.T) {
+	db := setupCacheTestDB(t)
+	c := NewCache(db)
+
+	// No records in db — GORM v2 Find returns empty slice + nil error,
+	// but our code also guards against gorm.ErrRecordNotFound as a safety net.
+	schemas, err := c.GetSchemas(nil, "mod", "tbl")
+	if err != nil {
+		t.Fatalf("GetSchemas error: %v", err)
+	}
+	if len(schemas) != 0 {
+		t.Fatalf("expected 0 schemas, got %d", len(schemas))
+	}
+
+	// Verify empty result is cached (same assertions as EmptyResult)
+	c.mu.RLock()
+	ent, ok := c.entries["mod:tbl"]
+	c.mu.RUnlock()
+	if !ok {
+		t.Fatal("expected empty result to be cached")
+	}
+	if len(ent.schemas) != 0 {
+		t.Errorf("expected 0 cached schemas, got %d", len(ent.schemas))
+	}
+	if ent.lastUpdatedAt != 0 {
+		t.Errorf("lastUpdatedAt: want 0, got %d", ent.lastUpdatedAt)
+	}
+}
+
 func TestCacheGetSchemas_ConcurrentLoad(t *testing.T) {
 	db := setupCacheTestDB(t)
 	c := NewCache(db)

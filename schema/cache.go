@@ -93,22 +93,28 @@ func (c *Cache) GetSchemas(ctx context.Context, moduleName, tableName string) ([
 		// Step 3: write-lock with double-check
 		c.mu.Lock()
 		ent, ok = c.entries[key]
-		if ok && c.ttl > 0 && time.Since(ent.cachedAt) <= c.ttl {
-			// Double-check: another goroutine refreshed while we waited
-			var lastUpdated int64
-			err := c.db.Model(&Schema{}).
-				Select("COALESCE(MAX(updated_at), 0)").
-				Where("module_name = ? AND table_name = ?", moduleName, tableName).
-				Scan(&lastUpdated).Error
-			if err == nil && lastUpdated == ent.lastUpdatedAt {
-				c.mu.Unlock()
-				return ent.schemas, nil
+		if ok {
+			// If TTL is enabled and expired, treat as miss
+			if c.ttl > 0 && time.Since(ent.cachedAt) > c.ttl {
+				ok = false
+			} else {
+				// Double-check: another goroutine refreshed while we waited
+				var lastUpdated int64
+				err := c.db.Model(&Schema{}).
+					Select("COALESCE(MAX(updated_at), 0)").
+					Where("module_name = ? AND table_name = ?", moduleName, tableName).
+					Scan(&lastUpdated).Error
+				if err == nil && lastUpdated == ent.lastUpdatedAt {
+					c.mu.Unlock()
+					return ent.schemas, nil
+				}
+				// Timestamp mismatch or error: treat as miss
+				ok = false
 			}
 		}
 
 		// Full query from db
 		var values []Schema
-		values = make([]Schema, 0)
 		var lastUpdated int64
 
 		values, err := gorm.G[Schema](c.db).
@@ -124,10 +130,14 @@ func (c *Cache) GetSchemas(ctx context.Context, moduleName, tableName string) ([
 		}
 
 		// Get max updated_at
-		c.db.Model(&Schema{}).
+		err = c.db.Model(&Schema{}).
 			Select("COALESCE(MAX(updated_at), 0)").
 			Where("module_name = ? AND table_name = ?", moduleName, tableName).
-			Scan(&lastUpdated)
+			Scan(&lastUpdated).Error
+		if err != nil {
+			c.mu.Unlock()
+			return nil, err
+		}
 
 		c.entries[key] = &cacheEntry{
 			schemas:       values,
