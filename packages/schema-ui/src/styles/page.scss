@@ -5,7 +5,6 @@
   flex-direction: column;
   gap: var(--su-gap);
   padding: var(--su-space-3);
-  background: var(--su-bg);
   min-height: 100%;
 }
 
@@ -43,6 +42,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--su-gap);
+  background-color: var(--su-bg);
+  border-radius: var(--su-radius);
+  box-shadow: var(--su-shadow);
 }
 
 .schema-page-search,
