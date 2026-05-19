@@ -75,7 +75,7 @@ func (c *Cache) GetSchemas(ctx context.Context, moduleName, tableName string) ([
 	if ok {
 		// Step 2: timestamp validation (lock-free)
 		var lastUpdated int64
-		err := c.db.Model(&Schema{}).
+		err := c.db.WithContext(ctx).Model(&Schema{}).
 			Select("COALESCE(MAX(updated_at), 0)").
 			Where("module_name = ? AND table_name = ?", moduleName, tableName).
 			Scan(&lastUpdated).Error
