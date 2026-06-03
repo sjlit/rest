@@ -312,10 +312,14 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model *T, columns
 			previousValues[row.Column] = m.GetFieldValue(previousModelRef, row.Column)
 		}
 		for _, row := range schemas {
-			if (len(columns) == 0 || slices.Contains(columns, row.Column)) && row.PrimaryKey == 0 {
-				v := m.GetFieldValue(modelRef, row.Column)
-				if previousValues[row.Column] != v {
-					updates[row.Column] = v
+			// Skip primary key and fields marked as disabled by GORM (e.g. <-:create reverse relations).
+			// This prevents callers from bypassing Schema filtering via the columns list.
+			if row.PrimaryKey == 0 && !slices.Contains(row.Attributes.Disable, schema.ScenarioUpdate) {
+				if len(columns) == 0 || slices.Contains(columns, row.Column) {
+					v := m.GetFieldValue(modelRef, row.Column)
+					if previousValues[row.Column] != v {
+						updates[row.Column] = v
+					}
 				}
 			}
 		}

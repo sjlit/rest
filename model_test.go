@@ -37,3 +37,41 @@ func TestApplyPreloadsBasic(t *testing.T) {
 		t.Fatal("expected non-nil db")
 	}
 }
+
+type updateTestModel struct {
+	ID       uint   `gorm:"primaryKey"`
+	Name     string `gorm:"size:100"`
+	Secret   string `gorm:"size:100;<-:create"` // create-only, Updatable=false
+	ReadOnly string `gorm:"size:100"`           // should also be excluded via Disable
+}
+
+func TestUpdateSkipsDisabledFields(t *testing.T) {
+	db := setupModelTestDB(t)
+	m, err := NewModel[updateTestModel](WithDB(db), WithModuleName("upd_test"))
+	if err != nil {
+		t.Fatalf("NewModel: %v", err)
+	}
+	// Seed a record directly via gorm
+	seed := updateTestModel{Name: "alice", Secret: "old-secret", ReadOnly: "ro-old"}
+	if err := db.Create(&seed).Error; err != nil {
+		t.Fatalf("seed create: %v", err)
+	}
+
+	// Update via Model: even though caller asks for these columns, they must be ignored
+	update := updateTestModel{Name: "bob", Secret: "new-secret", ReadOnly: "ro-new"}
+	_, err = m.Update(context.Background(), seed.ID, &update, "name", "secret", "read_only")
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	var got updateTestModel
+	if err := db.First(&got, seed.ID).Error; err != nil {
+		t.Fatalf("First: %v", err)
+	}
+	if got.Name != "bob" {
+		t.Errorf("Name should be updated: want 'bob', got %q", got.Name)
+	}
+	if got.Secret != "old-secret" {
+		t.Errorf("Secret (create-only) must NOT be updated: want 'old-secret', got %q", got.Secret)
+	}
+}
