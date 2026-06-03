@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"reflect"
 	"strings"
+	"sync"
 
 	"git.nobla.cn/golang/rest/schema"
 	"gorm.io/gorm"
@@ -27,6 +29,7 @@ type Config struct {
 	PrimaryKey string
 	Scenarios  []string
 	BuildUri   func(scenario string) (method, uri string)
+	Model      any // model type used to look up JSON tag for each field
 }
 
 func (g *Generator) Generate(ctx context.Context, db *gorm.DB, cfg Config) (*Spec, error) {
@@ -46,6 +49,7 @@ func (g *Generator) Generate(ctx context.Context, db *gorm.DB, cfg Config) (*Spe
 		spec:    spec,
 		cfg:     cfg,
 		visited: make(map[string]bool),
+		stmts:   make(map[string]*gorm.Statement),
 	}
 
 	for _, scenario := range cfg.Scenarios {
@@ -88,6 +92,8 @@ type genState struct {
 	spec    *Spec
 	cfg     Config
 	visited map[string]bool
+	stmts   map[string]*gorm.Statement // key = module:table
+	stmtMu  sync.Mutex
 }
 
 func (s *genState) buildOperation(scenario string, schemas []schema.Schema) *Operation {
@@ -275,10 +281,14 @@ func (s *genState) buildSchemaRef(module, table, scenario string) *SchemaRef {
 
 	for _, sc := range schemas {
 		prop := s.schemaToProperty(sc)
-		ref.Properties[sc.Column] = prop
+		// Property key MUST use JSON tag (the API contract), not GORM DBName.
+		// For relations, sc.Column is the struct field name; the JSON tag is
+		// the API name.
+		key := s.jsonName(module, table, sc.Column)
+		ref.Properties[key] = prop
 		for _, req := range sc.Rules.Required {
 			if req == scenario {
-				ref.Required = append(ref.Required, sc.Column)
+				ref.Required = append(ref.Required, key)
 				break
 			}
 		}
@@ -343,6 +353,70 @@ func uriToOpenAPIPath(uri string) string {
 		}
 	}
 	return strings.Join(parts, "/")
+}
+
+// stmtFor returns (and caches) a parsed gorm.Statement for the model in cfg.Model
+// whose DB table matches the given tableName. If cfg.Model is nil or the table
+// doesn't match, returns nil.
+func (s *genState) stmtFor(module, table string) *gorm.Statement {
+	key := module + ":" + table
+	s.stmtMu.Lock()
+	defer s.stmtMu.Unlock()
+	if st, ok := s.stmts[key]; ok {
+		return st
+	}
+	if s.cfg.Model == nil {
+		return nil
+	}
+	modelType := reflect.TypeOf(s.cfg.Model)
+	if modelType == nil {
+		return nil
+	}
+	// unwrap pointer
+	for modelType.Kind() == reflect.Ptr {
+		modelType = modelType.Elem()
+	}
+	stmt := &gorm.Statement{DB: s.db, Table: table}
+	if err := stmt.Parse(reflect.New(modelType).Interface()); err != nil {
+		log.Printf("[openapi] parse model %v failed: %v", s.cfg.Model, err)
+		return nil
+	}
+	if stmt.Table != table {
+		return nil
+	}
+	s.stmts[key] = stmt
+	return stmt
+}
+
+// jsonName returns the JSON tag name of the field whose GORM DBName matches
+// column. Falls back to column when the field is not found.
+func (s *genState) jsonName(module, table, column string) string {
+	stmt := s.stmtFor(module, table)
+	if stmt == nil || stmt.Schema == nil {
+		return column
+	}
+	field := stmt.Schema.LookUpField(column)
+	if field == nil {
+		// also try matching struct field name
+		for _, f := range stmt.Schema.Fields {
+			if f.Name == column {
+				field = f
+				break
+			}
+		}
+	}
+	if field == nil {
+		return column
+	}
+	tag := field.StructField.Tag.Get("json")
+	if tag == "" || tag == "-" {
+		return column
+	}
+	parts := strings.Split(tag, ",")
+	if parts[0] == "" {
+		return column
+	}
+	return parts[0]
 }
 
 func schemaName(module, table string) string {

@@ -164,6 +164,7 @@ func TestGenerate(t *testing.T) {
 		Plural:     "users",
 		Prefix:     "/api/v1",
 		PrimaryKey: "id",
+		Model:      (*TestUser)(nil),
 		Scenarios: []string{
 			schema.ScenarioCreate,
 			schema.ScenarioUpdate,
@@ -232,14 +233,22 @@ func TestGenerate(t *testing.T) {
 	if userSchema == nil || userSchema.Properties == nil {
 		t.Fatalf("expected %q to have properties", baseName)
 	}
+	// Verify property keys use JSON tag names (not GORM DBName)
+	if _, ok := userSchema.Properties["id"]; !ok {
+		t.Errorf("expected %q to have 'id' property (from json tag)", baseName)
+	}
 	if _, ok := userSchema.Properties["name"]; !ok {
-		t.Errorf("expected %q to have 'name' property", baseName)
+		t.Errorf("expected %q to have 'name' property (from json tag)", baseName)
 	}
 	if _, ok := userSchema.Properties["age"]; !ok {
-		t.Errorf("expected %q to have 'age' property", baseName)
+		t.Errorf("expected %q to have 'age' property (from json tag)", baseName)
+	}
+	// Orders field has json:"orders" tag, must be lowercased
+	if _, ok := userSchema.Properties["Orders"]; ok {
+		t.Errorf("unexpected 'Orders' property — should use JSON tag 'orders'")
 	}
 	if ordersProp, ok := userSchema.Properties["orders"]; !ok {
-		t.Errorf("expected %q to have 'orders' property", baseName)
+		t.Errorf("expected %q to have 'orders' property (from json tag)", baseName)
 	} else if ordersProp.Type != "array" || ordersProp.Items == nil {
 		t.Errorf("expected 'orders' to be an array with items")
 	}

@@ -494,6 +494,7 @@ func (r *Resource[T]) OpenApi(res http.ResponseWriter, req *http.Request) {
 				schema.ScenarioExport,
 			},
 			BuildUri: r.buildUri,
+			Model:    any((*T)(nil)),
 		},
 	); err == nil {
 		res.Header().Set("Content-Type", "application/json")
