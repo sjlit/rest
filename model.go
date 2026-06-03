@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"git.nobla.cn/golang/rest/internal/inflector"
+	"git.nobla.cn/golang/rest/internal/safelog"
 	"git.nobla.cn/golang/rest/query"
 	"git.nobla.cn/golang/rest/schema"
 	"gorm.io/gorm"
@@ -175,14 +176,9 @@ func (m *Model[T]) runAfterHooks(
 ) {
 	for _, fns := range [][]erasedAfterHookFunc{globalFns, localFns} {
 		for _, fn := range fns {
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						// 记录 panic，不阻断主流程
-					}
-				}()
+			safelog.SafeRun(ctx, "after", func() {
 				fn(ctx, db, model, diffAttrs)
-			}()
+			})
 		}
 	}
 }
@@ -195,14 +191,9 @@ func (m *Model[T]) runAfterDeleteHooks(
 ) {
 	for _, fns := range [][]erasedAfterDeleteHookFunc{globalFns, localFns} {
 		for _, fn := range fns {
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						// 记录 panic，不阻断主流程
-					}
-				}()
+			safelog.SafeRun(ctx, "afterDelete", func() {
 				fn(ctx, db, model)
-			}()
+			})
 		}
 	}
 }
