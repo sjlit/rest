@@ -162,3 +162,39 @@ func TestCompileHaving(t *testing.T) {
 		t.Errorf("expected HAVING SQL, got: %s", sql)
 	}
 }
+
+func TestCompileSelectRawExprArgs(t *testing.T) {
+	db := setupDryRunDB(t)
+	spec := QuerySpec{
+		Source:  TableSource("orders"),
+		Selects: []Expr{Raw("COALESCE(?, id)", 100)},
+	}
+	c := NewCompiler()
+	compiled, err := c.Compile(spec, db.Session(&gorm.Session{DryRun: true}))
+	if err != nil {
+		t.Fatalf("compile failed: %v", err)
+	}
+
+	// Build the SQL by calling Find on a dryrun session, then inspect the
+	// raw Statement. ToSQL would inline the bound Vars, so we check the
+	// underlying SQL/Vars directly.
+	compiled.Find(&[]map[string]any{})
+
+	// The placeholder ? must be preserved in the raw SQL (not expanded to
+	// the literal 100), and the corresponding value 100 must appear in Vars.
+	rawSQL := compiled.Statement.SQL.String()
+	if !strings.Contains(rawSQL, "COALESCE(?, id)") {
+		t.Errorf("expected raw SQL with placeholder preserved, got: %s", rawSQL)
+	}
+	bindings := compiled.Statement.Vars
+	found := false
+	for _, v := range bindings {
+		if v == int64(100) || v == int(100) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected arg 100 in bindings, got: %v", bindings)
+	}
+}

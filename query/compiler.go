@@ -3,6 +3,7 @@ package query
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -58,14 +59,18 @@ func (c *Compiler) Compile(spec QuerySpec, db *gorm.DB) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	// Select
+	// Select — combine all expressions into a single Select call so that
+	// RawExpr args (e.g. Raw("COALESCE(?, id)", 100)) can be bound as
+	// variadic placeholders, instead of being silently dropped.
 	if len(spec.Selects) > 0 {
-		selects := make([]string, len(spec.Selects))
-		for i, e := range spec.Selects {
-			sql, _ := c.compileExpr(e)
-			selects[i] = sql
+		parts := make([]string, 0, len(spec.Selects))
+		var allArgs []any
+		for _, e := range spec.Selects {
+			sql, args := c.compileExpr(e)
+			parts = append(parts, sql)
+			allArgs = append(allArgs, args...)
 		}
-		db = db.Select(selects)
+		db = db.Select(strings.Join(parts, ", "), allArgs...)
 	}
 
 	// GroupBy
