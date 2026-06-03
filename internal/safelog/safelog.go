@@ -4,7 +4,6 @@
 package safelog
 
 import (
-	"context"
 	"log"
 	"runtime/debug"
 )
@@ -12,7 +11,7 @@ import (
 // SafeRun executes fn and converts any panic into a logged error instead of
 // propagating. Use in after-hook runners where the parent operation has
 // already succeeded and a user callback must not corrupt the result.
-func SafeRun(ctx context.Context, phase string, fn func()) {
+func SafeRun(phase string, fn func()) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("[rest] %s hook panic recovered: %v\n%s", phase, r, debug.Stack())

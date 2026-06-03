@@ -98,7 +98,7 @@ func (c *Cache) GetSchemas(ctx context.Context, moduleName, tableName string) ([
 			if ok {
 				if !(c.ttl > 0 && time.Since(ent.cachedAt) > c.ttl) {
 					var lastUpdated int64
-					if e := c.db.Model(&Schema{}).
+					if e := c.db.WithContext(ctx).Model(&Schema{}).
 						Select("COALESCE(MAX(updated_at), 0)").
 						Where("module_name = ? AND table_name = ?", moduleName, tableName).
 						Scan(&lastUpdated).Error; e == nil && lastUpdated == ent.lastUpdatedAt {

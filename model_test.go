@@ -39,10 +39,9 @@ func TestApplyPreloadsBasic(t *testing.T) {
 }
 
 type updateTestModel struct {
-	ID       uint   `gorm:"primaryKey"`
-	Name     string `gorm:"size:100"`
-	Secret   string `gorm:"size:100;<-:create"` // create-only, Updatable=false
-	ReadOnly string `gorm:"size:100"`           // should also be excluded via Disable
+	ID     uint   `gorm:"primaryKey"`
+	Name   string `gorm:"size:100"`
+	Secret string `gorm:"size:100;<-:create"` // create-only, protected by Disable=[update]
 }
 
 func TestUpdateSkipsDisabledFields(t *testing.T) {
@@ -52,14 +51,14 @@ func TestUpdateSkipsDisabledFields(t *testing.T) {
 		t.Fatalf("NewModel: %v", err)
 	}
 	// Seed a record directly via gorm
-	seed := updateTestModel{Name: "alice", Secret: "old-secret", ReadOnly: "ro-old"}
+	seed := updateTestModel{Name: "alice", Secret: "old-secret"}
 	if err := db.Create(&seed).Error; err != nil {
 		t.Fatalf("seed create: %v", err)
 	}
 
 	// Update via Model: even though caller asks for these columns, they must be ignored
-	update := updateTestModel{Name: "bob", Secret: "new-secret", ReadOnly: "ro-new"}
-	_, err = m.Update(context.Background(), seed.ID, &update, "name", "secret", "read_only")
+	update := updateTestModel{Name: "bob", Secret: "new-secret"}
+	_, err = m.Update(context.Background(), seed.ID, &update, "name", "secret")
 	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}

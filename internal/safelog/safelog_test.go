@@ -1,7 +1,6 @@
 package safelog
 
 import (
-	"context"
 	"log"
 	"strings"
 	"testing"
@@ -18,7 +17,7 @@ func TestSafeRunRecoversPanic(t *testing.T) {
 	}))
 
 	called := false
-	SafeRun(context.Background(), "test", func() {
+	SafeRun("test", func() {
 		called = true
 		panic("boom")
 	})
@@ -35,7 +34,7 @@ func TestSafeRunRecoversPanic(t *testing.T) {
 
 func TestSafeRunNoPanic(t *testing.T) {
 	called := false
-	SafeRun(context.Background(), "ok", func() {
+	SafeRun("ok", func() {
 		called = true
 	})
 	if !called {

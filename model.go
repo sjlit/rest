@@ -176,7 +176,7 @@ func (m *Model[T]) runAfterHooks(
 ) {
 	for _, fns := range [][]erasedAfterHookFunc{globalFns, localFns} {
 		for _, fn := range fns {
-			safelog.SafeRun(ctx, "after", func() {
+			safelog.SafeRun("after", func() {
 				fn(ctx, db, model, diffAttrs)
 			})
 		}
@@ -191,7 +191,7 @@ func (m *Model[T]) runAfterDeleteHooks(
 ) {
 	for _, fns := range [][]erasedAfterDeleteHookFunc{globalFns, localFns} {
 		for _, fn := range fns {
-			safelog.SafeRun(ctx, "afterDelete", func() {
+			safelog.SafeRun("afterDelete", func() {
 				fn(ctx, db, model)
 			})
 		}

@@ -264,7 +264,9 @@ func TestCacheGetSchemas_ConcurrentLoad(t *testing.T) {
 		t.Errorf("expected 1 schema, got %d", len(ent.schemas))
 	}
 
-	t.Logf("observed query count: %d (expected to be near 1 after singleflight)", queryCount)
+	if queryCount > 5 {
+		t.Errorf("expected singleflight coalescing, got %d queries", queryCount)
+	}
 }
 
 func TestCacheGetVisibleSchemas(t *testing.T) {
