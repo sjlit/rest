@@ -176,7 +176,7 @@ func TestIntegrationOpenAPIEndpoint(t *testing.T) {
 	})
 	userResource.Register()
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/integration/user/openapi.json", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/integration/integ_user/openapi.json", nil)
 	rec := httptest.NewRecorder()
 	tr.ServeHTTP(rec, req)
 
@@ -195,8 +195,8 @@ func TestIntegrationOpenAPIEndpoint(t *testing.T) {
 	if spec.OpenAPI != "3.0.3" {
 		t.Errorf("openapi version: want 3.0.3, got %s", spec.OpenAPI)
 	}
-	if _, ok := spec.Paths["/api/v1/integration/user"]; !ok {
-		t.Error("expected path /api/v1/integration/user in spec")
+	if _, ok := spec.Paths["/api/v1/integration/integ_user"]; !ok {
+		t.Error("expected path /api/v1/integration/integ_user in spec")
 	}
 	if len(spec.Paths) == 0 {
 		t.Error("expected non-empty paths")
