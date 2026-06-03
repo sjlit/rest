@@ -356,8 +356,10 @@ func uriToOpenAPIPath(uri string) string {
 }
 
 // stmtFor returns (and caches) a parsed gorm.Statement for the model in cfg.Model
-// whose DB table matches the given tableName. If cfg.Model is nil or the table
-// doesn't match, returns nil.
+// keyed by module:table. The first call for a given key parses cfg.Model and
+// caches the resulting statement. Subsequent calls for the same module:table
+// (e.g. related-model lookups that share the primary model's table name) reuse
+// the cached statement so jsonName can resolve JSON tags.
 func (s *genState) stmtFor(module, table string) *gorm.Statement {
 	key := module + ":" + table
 	s.stmtMu.Lock()
@@ -381,9 +383,7 @@ func (s *genState) stmtFor(module, table string) *gorm.Statement {
 		log.Printf("[openapi] parse model %v failed: %v", s.cfg.Model, err)
 		return nil
 	}
-	if stmt.Table != table {
-		return nil
-	}
+	// Cache the statement so related-model lookups can reuse it.
 	s.stmts[key] = stmt
 	return stmt
 }
