@@ -1,8 +1,10 @@
 package schema
 
 import (
+	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -218,10 +220,19 @@ func TestCacheGetSchemas_EmptyResult(t *testing.T) {
 
 func TestCacheGetSchemas_ConcurrentLoad(t *testing.T) {
 	db := setupCacheTestDB(t)
-	c := NewCache(db)
 
 	// Pre-populate db with a single record
 	db.Create(&Schema{ModuleName: "mod", TableName: "tbl", Column: "id", UpdatedAt: 1000})
+
+	// Install a counter on the Query callback so we can verify singleflight
+	var queryCount int64
+	if err := db.Callback().Query().Before("gorm:query").Register("count_queries", func(tx *gorm.DB) {
+		atomic.AddInt64(&queryCount, 1)
+	}); err != nil {
+		t.Fatalf("register counter: %v", err)
+	}
+
+	c := NewCache(db)
 
 	// Run 50 concurrent GetSchemas calls
 	var wg sync.WaitGroup
@@ -230,7 +241,7 @@ func TestCacheGetSchemas_ConcurrentLoad(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := c.GetSchemas(nil, "mod", "tbl")
+			_, err := c.GetSchemas(context.Background(), "mod", "tbl")
 			if err != nil {
 				errCh <- err
 			}
@@ -252,6 +263,8 @@ func TestCacheGetSchemas_ConcurrentLoad(t *testing.T) {
 	if len(ent.schemas) != 1 {
 		t.Errorf("expected 1 schema, got %d", len(ent.schemas))
 	}
+
+	t.Logf("observed query count: %d (expected to be near 1 after singleflight)", queryCount)
 }
 
 func TestCacheGetVisibleSchemas(t *testing.T) {

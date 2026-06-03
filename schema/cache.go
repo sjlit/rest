@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 )
 
@@ -14,6 +15,7 @@ type Cache struct {
 	entries map[string]*cacheEntry
 	ttl     time.Duration
 	db      *gorm.DB
+	sf      singleflight.Group
 }
 
 type cacheEntry struct {
@@ -60,27 +62,24 @@ func (c *Cache) InvalidateAll() {
 func (c *Cache) GetSchemas(ctx context.Context, moduleName, tableName string) ([]Schema, error) {
 	key := c.key(moduleName, tableName)
 
-	// Step 1: read-lock check
+	// Step 1: read-lock fast path with TTL + timestamp validation
 	c.mu.RLock()
 	ent, ok := c.entries[key]
 	c.mu.RUnlock()
 
 	if ok {
-		// TTL check
 		if c.ttl > 0 && time.Since(ent.cachedAt) > c.ttl {
 			ok = false
 		}
 	}
 
 	if ok {
-		// Step 2: timestamp validation (lock-free)
 		var lastUpdated int64
 		err := c.db.WithContext(ctx).Model(&Schema{}).
 			Select("COALESCE(MAX(updated_at), 0)").
 			Where("module_name = ? AND table_name = ?", moduleName, tableName).
 			Scan(&lastUpdated).Error
 		if err != nil {
-			// Timestamp query failed: degrade to direct query
 			ok = false
 		} else if lastUpdated == ent.lastUpdatedAt {
 			return ent.schemas, nil
@@ -90,61 +89,53 @@ func (c *Cache) GetSchemas(ctx context.Context, moduleName, tableName string) ([
 	}
 
 	if !ok {
-		// Step 3: write-lock with double-check
-		c.mu.Lock()
-		ent, ok = c.entries[key]
-		if ok {
-			// If TTL is enabled and expired, treat as miss
-			if c.ttl > 0 && time.Since(ent.cachedAt) > c.ttl {
-				ok = false
-			} else {
-				// Double-check: another goroutine may have refreshed while we waited
-				var lastUpdated int64
-				err := c.db.Model(&Schema{}).
-					Select("COALESCE(MAX(updated_at), 0)").
-					Where("module_name = ? AND table_name = ?", moduleName, tableName).
-					Scan(&lastUpdated).Error
-				if err == nil && lastUpdated == ent.lastUpdatedAt {
-					c.mu.Unlock()
-					return ent.schemas, nil
+		// singleflight coalesces concurrent loads for the same key
+		v, err, _ := c.sf.Do(key, func() (any, error) {
+			// Re-check under write lock (another goroutine may have populated)
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			ent, ok := c.entries[key]
+			if ok {
+				if !(c.ttl > 0 && time.Since(ent.cachedAt) > c.ttl) {
+					var lastUpdated int64
+					if e := c.db.Model(&Schema{}).
+						Select("COALESCE(MAX(updated_at), 0)").
+						Where("module_name = ? AND table_name = ?", moduleName, tableName).
+						Scan(&lastUpdated).Error; e == nil && lastUpdated == ent.lastUpdatedAt {
+						return &cacheEntry{schemas: ent.schemas, lastUpdatedAt: ent.lastUpdatedAt, cachedAt: ent.cachedAt}, nil
+					}
 				}
-				ok = false
 			}
-		}
-
-		// Full query from db
-		var values []Schema
-		var lastUpdated int64
-
-		values, err := gorm.G[Schema](c.db).
-			Where("module_name = ? AND table_name = ?", moduleName, tableName).
-			Order("position ASC").
-			Find(ctx)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			err = nil
-		}
+			var values []Schema
+			var lastUpdated int64
+			values, err := gorm.G[Schema](c.db).
+				Where("module_name = ? AND table_name = ?", moduleName, tableName).
+				Order("position ASC").
+				Find(ctx)
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				err = nil
+			}
+			if err != nil {
+				return nil, err
+			}
+			if err := c.db.Model(&Schema{}).
+				Select("COALESCE(MAX(updated_at), 0)").
+				Where("module_name = ? AND table_name = ?", moduleName, tableName).
+				Scan(&lastUpdated).Error; err != nil {
+				return nil, err
+			}
+			entry := &cacheEntry{
+				schemas:       values,
+				lastUpdatedAt: lastUpdated,
+				cachedAt:      time.Now(),
+			}
+			c.entries[key] = entry
+			return entry, nil
+		})
 		if err != nil {
-			c.mu.Unlock()
 			return nil, err
 		}
-
-		// Get max updated_at
-		err = c.db.Model(&Schema{}).
-			Select("COALESCE(MAX(updated_at), 0)").
-			Where("module_name = ? AND table_name = ?", moduleName, tableName).
-			Scan(&lastUpdated).Error
-		if err != nil {
-			c.mu.Unlock()
-			return nil, err
-		}
-
-		c.entries[key] = &cacheEntry{
-			schemas:       values,
-			lastUpdatedAt: lastUpdated,
-			cachedAt:      time.Now(),
-		}
-		c.mu.Unlock()
-		return values, nil
+		return v.(*cacheEntry).schemas, nil
 	}
 
 	return ent.schemas, nil
