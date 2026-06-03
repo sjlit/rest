@@ -22,7 +22,7 @@ export function generateSchemaRule(
   if (rule.required && (rule.required as string[]).includes(scenario)) {
     rules.push({
       required: true,
-      message: t('validation.required', [schema.label]),
+      message: t('validation.required', schema.label),
       trigger: 'blur',
     })
   }
@@ -30,7 +30,7 @@ export function generateSchemaRule(
   if (rule.min > 0 && schema.type === 'string') {
     rules.push({
       min: rule.min,
-      message: t('validation.min', [schema.label, rule.min]),
+      message: t('validation.min', schema.label, rule.min),
       trigger: 'blur',
     })
   }
@@ -38,7 +38,7 @@ export function generateSchemaRule(
   if (rule.max > 0 && schema.type === 'string') {
     rules.push({
       max: rule.max,
-      message: t('validation.max', [schema.label, rule.max]),
+      message: t('validation.max', schema.label, rule.max),
       trigger: 'blur',
     })
   }
@@ -46,7 +46,7 @@ export function generateSchemaRule(
   if (rule.type) {
     rules.push({
       type: rule.type,
-      message: t('validation.type', [schema.label]),
+      message: t('validation.type', schema.label),
       trigger: 'blur',
     })
   }
@@ -54,7 +54,7 @@ export function generateSchemaRule(
   if (rule.regular) {
     rules.push({
       pattern: new RegExp(rule.regular),
-      message: t('validation.pattern', [schema.label]),
+      message: t('validation.pattern', schema.label),
       trigger: 'blur',
     })
   }

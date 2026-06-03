@@ -126,5 +126,11 @@ export interface CRUDOptions {
   module?: string
   table?: string
   apiPrefix?: string
+  httpClient: {
+    get: (url: string, config?: any) => Promise<any>
+    post: (url: string, data?: any, config?: any) => Promise<any>
+    put: (url: string, data?: any, config?: any) => Promise<any>
+    delete: (url: string, data?: any, config?: any) => Promise<any>
+  }
   schemas?: Schema[] | Record<string, Schema>
 }

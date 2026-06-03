@@ -1,6 +1,5 @@
 import pluralize from 'pluralize'
 import type { Schema, Model, CRUDOptions, Pagination, Sortable, Scenario } from '../core/types'
-import type { SchemaUIConfig } from '../config'
 
 type UriScenario = Scenario | 'get'
 
@@ -11,7 +10,7 @@ const DEFAULT_PAGINATION: Pagination = {
 }
 
 export class CRUD {
-  private opts: Required<CRUDOptions> & { httpClient: SchemaUIConfig['httpClient']; apiPrefix: string }
+  private opts: Required<CRUDOptions>
   primaryKey = ''
   schemas: Schema[] = []
   models: Model[] = []
@@ -20,7 +19,7 @@ export class CRUD {
   fixedQuery: Record<string, any> = {}
   pagination: Pagination = { ...DEFAULT_PAGINATION }
 
-  constructor(options: CRUDOptions & { httpClient: SchemaUIConfig['httpClient']; apiPrefix?: string }) {
+  constructor(options: CRUDOptions) {
     let schemas: Schema[] = []
     if (Array.isArray(options.schemas)) {
       schemas = options.schemas
@@ -32,8 +31,8 @@ export class CRUD {
       module: options.module || '',
       table: options.table || '',
       apiPrefix: options.apiPrefix || 'rest',
-      schemas: schemas.map(s => ({ ...s, rules: s.rules ? { ...s.rules } : { min: 0, max: 0, type: '', unique: false, required: [] } })),
       httpClient: options.httpClient,
+      schemas: schemas.map(s => ({ ...s, rules: s.rules ? { ...s.rules } : { min: 0, max: 0, type: '', unique: false, required: [] } })),
     }
   }
 
@@ -194,8 +193,9 @@ export class CRUD {
     return this
   }
 
-  addQueryParams(k: string, v: any): void {
+  addQueryParams(k: string, v: any): this {
     this.queryParams[k] = v
+    return this
   }
 
   setQueryParams(qs: Record<string, any>): this {
@@ -312,6 +312,7 @@ export class CRUD {
     if (this.sortable?.column) {
       queryParams.sort = this.sortable.order === 'descending' ? `-${this.sortable.column}` : this.sortable.column
     }
+    queryParams.__format = 'both'
     const res = await this.opts.httpClient.get(this.__buildUri('export'), { params: queryParams, responseType: 'blob' })
     this.__downloadFile(res, `${this.opts.table}.csv`)
   }

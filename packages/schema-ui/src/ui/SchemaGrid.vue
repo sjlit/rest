@@ -81,7 +81,6 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   selection: [selection: any[]]
   sort: [sortable: { column: string; order: 'ascending' | 'descending' | null }]
-  dragend: []
 }>()
 
 const isMobileView = ref(false)

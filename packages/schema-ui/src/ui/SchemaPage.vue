@@ -223,7 +223,34 @@ const rowActionList = computed((): ActionType[] => {
 
 const batchActionList = computed((): ActionType[] => props.batchActions)
 const formActionList = computed((): ActionType[] => {
-  if (props.formActions.length > 0) return props.formActions
+  if (props.formActions.length > 0) {
+    // Wrap external actions so formSubmit event is always emitted first,
+    // then the original callback runs. This keeps the @formSubmit event
+    // meaningful even when consumers pass custom formActions.
+    return props.formActions.map((a) => {
+      if (a.asyncCallback) {
+        const original = a.asyncCallback
+        return {
+          ...a,
+          asyncCallback: async (model: Model, schemas?: Schema[]) => {
+            emit('formSubmit', model, formScenario.value)
+            await original(model, schemas, a)
+          },
+        }
+      }
+      if (a.callback) {
+        const original = a.callback
+        return {
+          ...a,
+          asyncCallback: async (model: Model, schemas?: Schema[]) => {
+            emit('formSubmit', model, formScenario.value)
+            original(model, schemas)
+          },
+        }
+      }
+      return a
+    })
+  }
   return [
     {
       name: 'save',
