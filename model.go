@@ -551,7 +551,7 @@ func NewModel[T any](opts ...Option) (v *Model[T], err error) {
 	}
 	v.db = v.opts.db.Session(&gorm.Session{
 		NewDB: true,
-	}).Debug()
+	})
 	var model T
 	if err = v.db.Statement.Parse(&model); err != nil {
 		return
