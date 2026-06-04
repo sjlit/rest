@@ -71,6 +71,14 @@ type (
 		BaseModel
 		TenantID string `json:"tenant_id" gorm:"column:tenant_id;type:char(60);index"`
 	}
+
+	ModuleNamer interface {
+		ModuleName() string
+	}
+
+	ScenarioProvider interface {
+		Scenarios() []string
+	}
 )
 
 type (

@@ -548,6 +548,16 @@ func NewModel[T any](opts ...Option) (v *Model[T], err error) {
 		NewDB: true,
 	})
 	var model T
+	if v.opts.moduleName == "" {
+		if mm, ok := any(model).(ModuleNamer); ok {
+			v.opts.moduleName = mm.ModuleName()
+		}
+	}
+	if len(v.opts.scenarios) == 0 {
+		if sp, ok := any(model).(ScenarioProvider); ok {
+			v.opts.scenarios = sp.Scenarios()
+		}
+	}
 	if err = v.db.Statement.Parse(&model); err != nil {
 		return
 	}
