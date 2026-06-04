@@ -520,7 +520,7 @@ func NewResource[T any](model *Model[T], cfg ResourceConfig) *Resource[T] {
 	}
 }
 
-func NewResourceFromModel[T any](cfg ResourceConfig, opts ...Option) (resource *Resource[T], err error) {
+func NewResourceWithOptions[T any](cfg ResourceConfig, opts ...Option) (resource *Resource[T], err error) {
 	var modelValue *Model[T]
 	modelValue, err = NewModel[T](opts...)
 	if err != nil {
