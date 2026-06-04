@@ -54,7 +54,7 @@
     <el-dialog v-if="formMode === 'dialog'" v-model="formVisible" :title="formTitle" :width="formWidth" draggable
       destroy-on-close>
       <SchemaForm v-bind="formProps" :schemas="formSchemas" :scenario="formScenario" :model="formModel"
-        :actions="formActionList">
+        :actions="formActionList" :errors="formErrors">
         <template #default="{ model, schema }">
           <slot name="crudform" :model="model" :schema="schema" />
         </template>
@@ -62,7 +62,7 @@
     </el-dialog>
     <el-drawer v-else v-model="formVisible" :title="formTitle" :size="formWidth" destroy-on-close>
       <SchemaForm v-bind="formProps" :schemas="formSchemas" :scenario="formScenario" :model="formModel"
-        :actions="formActionList">
+        :actions="formActionList" :errors="formErrors">
         <template #default="{ model, schema }">
           <slot name="crudform" :model="model" :schema="schema" />
         </template>
@@ -120,6 +120,7 @@ interface Props {
   gridProps?: Record<string, any>
   formProps?: Record<string, any>
   presetQuery?: Record<string, any>
+  formErrors?: Record<string, string>
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -138,6 +139,7 @@ const props = withDefaults(defineProps<Props>(), {
   gridProps: () => ({}),
   formProps: () => ({}),
   presetQuery: () => ({}),
+  formErrors: () => ({}),
 })
 
 const emit = defineEmits<{
@@ -165,6 +167,7 @@ const formModel = ref<Model>({})
 const selections = ref<any[]>([])
 const detailVisible = ref(false)
 const detailModel = ref<Model>({})
+const formSubmitting = ref(false)
 
 watch(() => props.presetQuery, (val) => {
   searchModel.value = { ...val }
@@ -222,34 +225,29 @@ const rowActionList = computed((): ActionType[] => {
 })
 
 const batchActionList = computed((): ActionType[] => props.batchActions)
+
+// Promise-based submit mechanism: the save action's asyncCallback returns
+// a Promise that resolves when the parent (SchemaViewer) completes the API call.
+let formSubmitResolve: (() => void) | null = null
+let formSubmitReject: ((err: any) => void) | null = null
+
+function resolveFormSubmit() {
+  formSubmitResolve?.()
+  formSubmitResolve = null
+  formSubmitReject = null
+}
+
+function rejectFormSubmit(err: any) {
+  formSubmitReject?.(err)
+  formSubmitResolve = null
+  formSubmitReject = null
+}
+
 const formActionList = computed((): ActionType[] => {
   if (props.formActions.length > 0) {
-    // Wrap external actions so formSubmit event is always emitted first,
-    // then the original callback runs. This keeps the @formSubmit event
-    // meaningful even when consumers pass custom formActions.
-    return props.formActions.map((a) => {
-      if (a.asyncCallback) {
-        const original = a.asyncCallback
-        return {
-          ...a,
-          asyncCallback: async (model: Model, schemas?: Schema[]) => {
-            emit('formSubmit', model, formScenario.value)
-            await original(model, schemas, a)
-          },
-        }
-      }
-      if (a.callback) {
-        const original = a.callback
-        return {
-          ...a,
-          asyncCallback: async (model: Model, schemas?: Schema[]) => {
-            emit('formSubmit', model, formScenario.value)
-            original(model, schemas)
-          },
-        }
-      }
-      return a
-    })
+    // External formActions are used as-is; the parent component
+    // (e.g. SchemaViewer) handles save logic and form closing.
+    return props.formActions
   }
   return [
     {
@@ -257,8 +255,19 @@ const formActionList = computed((): ActionType[] => {
       label: t('action.save'),
       type: 'primary',
       asyncCallback: async (model) => {
+        formSubmitting.value = true
         emit('formSubmit', model, formScenario.value)
-        formVisible.value = false
+        // Wait for the parent to resolve/reject (via resolveFormSubmit/rejectFormSubmit)
+        return new Promise<void>((resolve, reject) => {
+          formSubmitResolve = () => {
+            formSubmitting.value = false
+            resolve()
+          }
+          formSubmitReject = (err: any) => {
+            formSubmitting.value = false
+            reject(err)
+          }
+        })
       },
     },
   ]
@@ -310,5 +319,12 @@ function handlePageChange(index: number) {
   emit('pageChange', index)
 }
 
-defineExpose({ openEdit: handleEdit, openDetail: handleDetail, closeForm })
+defineExpose({
+  openEdit: handleEdit,
+  openDetail: handleDetail,
+  closeForm,
+  formSubmitting,
+  resolveFormSubmit,
+  rejectFormSubmit,
+})
 </script>

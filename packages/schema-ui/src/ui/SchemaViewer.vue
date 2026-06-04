@@ -5,8 +5,9 @@
       :showSearch="showSearch" :showToolbar="showToolbar" :showPagination="showPagination" :readonly="readonly"
       :searchActions="searchActionList" :rowActions="rowActionList" :batchActions="batchActionList"
       :formActions="formActionList" :gridProps="gridProps" :formProps="formProps" :presetQuery="presetQuery"
+      :formErrors="crud?.getFieldErrors() || {}"
       @search="handleSearch" @create="handleCreate" @delete="handleDelete" @pageChange="handlePageChange"
-      @sortChange="handleSortChange" @selectionChange="handleSelectionChange" @formSubmit="handleFormSubmit">
+      @sortChange="handleSortChange" @formSubmit="handleFormSubmit">
       <template #searchform="{ model, schema }">
         <slot name="searchform" :model="model" :schema="schema" />
       </template>
@@ -96,7 +97,6 @@ const crud = ref<CRUD | null>(null)
 const schemas = ref<Schema[]>([])
 const searching = ref(false)
 const isReady = ref(false)
-const selections = ref<any[]>([])
 const schemaPageRef = ref<any>(null)
 
 const pagination = computed(() => {
@@ -170,24 +170,10 @@ const batchActionList = computed((): ActionType[] => {
 })
 
 const formActionList = computed((): ActionType[] => {
-  if (props.formActions.length > 0) return props.formActions
-  return [
-    {
-      name: 'save',
-      label: t('action.save'),
-      type: 'primary',
-      asyncCallback: async (model) => {
-        crud.value!.resetError()
-        const isCreate = !model[crud.value!.primaryKey]
-        if (isCreate) {
-          await crud.value!.createModel(model)
-        } else {
-          await crud.value!.updateModel(model)
-        }
-        schemaPageRef.value?.closeForm()
-      },
-    },
-  ]
+  // Pass through user-provided formActions only.
+  // When empty, SchemaPage uses its built-in save action which emits
+  // 'formSubmit' — handled by handleFormSubmit below.
+  return props.formActions
 })
 
 async function init() {
@@ -203,11 +189,10 @@ async function init() {
   schemas.value = loadedSchemas
   crud.value = instance
 
-  for (const key in props.presetQuery) {
-    instance.addQueryParams(key, props.presetQuery[key])
+  // Use fixedQuery for presetQuery so they survive setQueryParams during search
+  if (Object.keys(props.presetQuery).length > 0) {
+    instance.setFixedQuery(props.presetQuery)
   }
-  // TODO: presetQuery values should also be visible in SchemaPage's search form.
-  // SchemaPage currently does not expose a way to pre-populate searchModel.
 
   if (props.defaultSort) {
     if (props.defaultSort.startsWith('-')) {
@@ -327,10 +312,6 @@ function handleSortChange(e: { column: string; order: 'ascending' | 'descending'
     })
 }
 
-function handleSelectionChange(selection: any[]) {
-  selections.value = selection
-}
-
 async function handleFormSubmit(model: Model, scenario: Scenario) {
   crud.value!.resetError()
   try {
@@ -339,9 +320,14 @@ async function handleFormSubmit(model: Model, scenario: Scenario) {
     } else {
       await crud.value!.updateModel(model)
     }
-  } catch (e) {
+    schemaPageRef.value?.closeForm()
+    schemaPageRef.value?.resolveFormSubmit()
+  } catch (e: any) {
     console.error('Form submit failed:', e)
-    throw e
+    // Surface error to the form via fieldErrors
+    const message = e?.message || e?.response?.data?.message || '保存失败'
+    crud.value!.setColumnError('*', message)
+    schemaPageRef.value?.rejectFormSubmit(e)
   }
 }
 </script>

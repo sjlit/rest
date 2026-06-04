@@ -76,6 +76,7 @@ interface Props {
   gridCols?: number
   actions?: ActionType[]
   autoSubmit?: boolean
+  errors?: Record<string, string>
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -87,11 +88,8 @@ const props = withDefaults(defineProps<Props>(), {
   gridCols: 0,
   actions: () => [],
   autoSubmit: false,
+  errors: () => ({}),
 })
-
-const emit = defineEmits<{
-  submit: [model: Model, schemas: Schema[]]
-}>()
 
 const formRef = ref<any>(null)
 const formElement = ref<HTMLElement | null>(null)
@@ -180,6 +178,17 @@ onMounted(() => {
       { deep: true }
     )
   )
+
+  // Sync external errors prop to internal fieldErrors
+  stopWatchers.push(
+    watch(
+      () => props.errors,
+      (val) => {
+        fieldErrors.value = { ...val }
+      },
+      { deep: true, immediate: true }
+    )
+  )
 })
 
 onUnmounted(() => {
@@ -200,7 +209,6 @@ async function submit(): Promise<Model> {
 
   try {
     await formRef.value!.validate()
-    emit('submit', model, displayColumns.value)
     return model
   } catch (e: any) {
     if (e && typeof e === 'object') {

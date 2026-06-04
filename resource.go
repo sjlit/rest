@@ -504,6 +504,10 @@ func (r *Resource[T]) OpenApi(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+func (r *Resource[T]) ModelValue() *Model[T] {
+	return r.model
+}
+
 func NewResource[T any](model *Model[T], cfg ResourceConfig) *Resource[T] {
 	return &Resource[T]{
 		model:         model,
@@ -514,4 +518,14 @@ func NewResource[T any](model *Model[T], cfg ResourceConfig) *Resource[T] {
 		tenantResolve: cfg.TenantResolve,
 		userResolve:   cfg.UserResolve,
 	}
+}
+
+func NewResourceFromModel[T any](cfg ResourceConfig, opts ...Option) (resource *Resource[T], err error) {
+	var modelValue *Model[T]
+	modelValue, err = NewModel[T](opts...)
+	if err != nil {
+		return
+	}
+	resource = NewResource(modelValue, cfg)
+	return
 }

@@ -159,6 +159,23 @@ userResource := rest.NewResource(model, rest.ResourceConfig{
 userResource.Register() // 自动注册 Create / Update / Delete / Detail / Search / Export / OpenAPI 路由
 ```
 
+如果想合并「构造 Model」与「包装为 Resource」两步，可使用便捷函数 `NewResourceFromModel`，错误会一并返回：
+
+```go
+userResource, err := rest.NewResourceFromModel[User](rest.ResourceConfig{
+    Router:    router,
+    Prefix:    "/api/v1",
+    Formatter: formatter,
+},
+    rest.WithDB(db),
+    rest.WithModuleName("user"),
+)
+if err != nil {
+    panic(err)
+}
+userResource.Register()
+```
+
 `ResourceConfig` 字段：
 
 | 字段 | 说明 |

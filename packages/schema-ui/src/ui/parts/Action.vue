@@ -33,9 +33,14 @@ function handleClick() {
     if (typeof props.action.hidden === 'function') {
       const result = props.action.hidden(props.model || {})
       if (result instanceof Promise) {
-        result.then((hidden) => {
-          if (!hidden) emit('click', props.action, loading)
-        })
+        result
+          .then((hidden) => {
+            if (!hidden) emit('click', props.action, loading)
+          })
+          .catch((err) => {
+            console.error('Action hidden check failed:', err)
+            emit('click', props.action, loading)
+          })
         return
       }
       if (result) return
