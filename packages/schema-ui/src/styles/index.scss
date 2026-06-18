@@ -1,5 +1,17 @@
-@import './variables.scss';
-@import './page.scss';
-@import './grid.scss';
-@import './form.scss';
-@import './cell.scss';
+// Public SCSS bundle entry.
+//
+// Sub-stylesheets (page/grid/form/cell) are also imported individually from
+// their respective .vue components, so this file is *not* pulled into the
+// vite build today. It exists for external consumers who want the full token
+// + component CSS in one shot — e.g.:
+//
+//   import '@ace/schema-ui/styles/index.scss'
+//
+// To make that work end-to-end, expose this file (or a compiled `dist/style.css`)
+// via `package.json` `exports` under a `./styles` subpath.
+
+@use './variables.scss';
+@use './page.scss';
+@use './grid.scss';
+@use './form.scss';
+@use './cell.scss';

@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"git.nobla.cn/golang/rest/formats"
@@ -24,6 +25,7 @@ type (
 		prefix        string
 		router        Router
 		responder     Responder
+		registered    atomic.Bool
 		formatter     *formats.Formatter
 		tenantResolve ResolveTenantFunc
 		userResolve   ResolveUserFunc
@@ -182,6 +184,12 @@ func (r *Resource[T]) Register() {
 		method string
 		uri    string
 	)
+	if !r.registered.CompareAndSwap(false, true) {
+		return
+	}
+	if r.router == nil || r.model == nil {
+		return
+	}
 	if r.model.HasScenario(schema.ScenarioCreate) {
 		method, uri = r.buildUri(schema.ScenarioCreate)
 		r.router.Handle(method, uri, r.Create)
@@ -527,5 +535,6 @@ func NewResourceWithOptions[T any](cfg ResourceConfig, opts ...Option) (resource
 		return
 	}
 	resource = NewResource(modelValue, cfg)
+	resource.Register()
 	return
 }
