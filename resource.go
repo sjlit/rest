@@ -3,6 +3,7 @@ package rest
 import (
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,20 +18,21 @@ import (
 	"git.nobla.cn/golang/rest/openapi"
 	"git.nobla.cn/golang/rest/query"
 	"git.nobla.cn/golang/rest/schema"
+	"gorm.io/gorm"
 )
 
-type (
-	Resource[T any] struct {
-		model         *Model[T]
-		prefix        string
-		router        Router
-		responder     Responder
-		registered    atomic.Bool
-		formatter     *formats.Formatter
-		tenantResolve ResolveTenantFunc
-		userResolve   ResolveUserFunc
-	}
-)
+// Resource 是动态模型的 HTTP 资源包装, 自动生成标准 RESTful 路由。
+// 若希望获得编译期类型安全, 请使用 TypedResource[T]。
+type Resource struct {
+	model         *Model
+	prefix        string
+	router        Router
+	responder     Responder
+	registered    atomic.Bool
+	formatter     *formats.Formatter
+	tenantResolve ResolveTenantFunc
+	userResolve   ResolveUserFunc
+}
 
 type ResourceConfig struct {
 	Router        Router
@@ -41,7 +43,7 @@ type ResourceConfig struct {
 	UserResolve   ResolveUserFunc
 }
 
-func (r *Resource[T]) buildUri(scenario string) (method string, uri string) {
+func (r *Resource) buildUri(scenario string) (method string, uri string) {
 	switch scenario {
 	case schema.ScenarioCreate:
 		method = http.MethodPost
@@ -68,7 +70,7 @@ func (r *Resource[T]) buildUri(scenario string) (method string, uri string) {
 	return
 }
 
-func (r *Resource[T]) buildQuery(req *http.Request, schemas []schema.Schema) *query.Builder {
+func (r *Resource) buildQuery(req *http.Request, schemas []schema.Schema) *query.Builder {
 	var (
 		formValue string
 	)
@@ -107,14 +109,17 @@ func (r *Resource[T]) buildQuery(req *http.Request, schemas []schema.Schema) *qu
 					sep = string(s)
 				}
 			}
-			if ss := strings.Split(formValue, sep); len(ss) == 2 {
-				builder.WhereGroup(func(b *query.Builder) {
-					b.Where(row.Column, query.OpGte, ss[0])
-					b.Where(row.Column, query.OpLte, ss[1])
-				})
-			} else {
-				builder.Where(row.Column, query.OpEq, formValue)
+			// 仅在找到分隔符时按范围解析, 否则 Split("") 会按字符切分导致误判
+			if sep != "" {
+				if ss := strings.Split(formValue, sep); len(ss) == 2 {
+					builder.WhereGroup(func(b *query.Builder) {
+						b.Where(row.Column, query.OpGte, ss[0])
+						b.Where(row.Column, query.OpLte, ss[1])
+					})
+					continue
+				}
 			}
+			builder.Where(row.Column, query.OpEq, formValue)
 		case schema.FormatInteger, schema.FormatFloat:
 			builder.Where(row.Column, query.OpEq, formValue)
 		default:
@@ -133,6 +138,10 @@ func (r *Resource[T]) buildQuery(req *http.Request, schemas []schema.Schema) *qu
 	if sortPar != "" {
 		sorts := strings.SplitSeq(sortPar, ",")
 		for s := range sorts {
+			// 跳过空段(如 "name," 或 "a,,b"), 避免对空字符串取 s[0] 越界 panic
+			if s == "" {
+				continue
+			}
 			if s[0] == '-' {
 				builder.OrderBy(s[1:], "DESC")
 			} else {
@@ -147,20 +156,31 @@ func (r *Resource[T]) buildQuery(req *http.Request, schemas []schema.Schema) *qu
 	return builder
 }
 
-func (r *Resource[T]) findPrimaryKey(req *http.Request, scenario string) string {
+func (r *Resource) findPrimaryKey(req *http.Request, scenario string) string {
 	_, fullUri := r.buildUri(scenario)
-	reqPath := req.URL.Path
-	fullParts := strings.Split(fullUri, "/")
-	reqParts := strings.Split(reqPath, "/")
-	for i, part := range fullParts {
-		if strings.HasPrefix(part, ":") && i < len(reqParts) {
-			return reqParts[i]
+	// 1) 精确匹配（含 :id）：直接按段对比
+	fullParts := strings.Split(strings.TrimSuffix(fullUri, "/"), "/")
+	reqParts := strings.Split(strings.TrimSuffix(req.URL.Path, "/"), "/")
+	if len(fullParts) == len(reqParts) {
+		for i, part := range fullParts {
+			if strings.HasPrefix(part, ":") {
+				return reqParts[i]
+			}
 		}
+	}
+	// 2) 回退：以 fullUri 前缀截断 path，取首段非空值
+	//    处理请求 path 多/少一段或带尾斜杠等边界情况。
+	if trimmed, ok := strings.CutPrefix(req.URL.Path, fullUri); ok {
+		trimmed = strings.TrimPrefix(trimmed, "/")
+		if i := strings.IndexByte(trimmed, '/'); i >= 0 {
+			trimmed = trimmed[:i]
+		}
+		return trimmed
 	}
 	return ""
 }
 
-func (r *Resource[T]) getRuntimeScope(req *http.Request) (runtimeScope *RuntimeScope, err error) {
+func (r *Resource) getRuntimeScope(req *http.Request) (runtimeScope *RuntimeScope, err error) {
 	runtimeScope = &RuntimeScope{
 		ModuleName: r.model.GetNaming().ModuleName,
 		TableName:  r.model.GetNaming().TableName,
@@ -179,7 +199,7 @@ func (r *Resource[T]) getRuntimeScope(req *http.Request) (runtimeScope *RuntimeS
 	return runtimeScope, nil
 }
 
-func (r *Resource[T]) Register() {
+func (r *Resource) Register() {
 	var (
 		method string
 		uri    string
@@ -210,7 +230,7 @@ func (r *Resource[T]) Register() {
 		method, uri = r.buildUri(schema.ScenarioSearch)
 		r.router.Handle(method, uri, r.Search)
 	}
-	if r.model.HasScenario(schema.ScenarioExport) {
+	if r.model.HasScenario(schema.ScenarioExport) && r.formatter != nil {
 		method, uri = r.buildUri(schema.ScenarioExport)
 		r.router.Handle(method, uri, r.Export)
 	}
@@ -220,27 +240,55 @@ func (r *Resource[T]) Register() {
 	}
 }
 
-func (r *Resource[T]) Respond(res http.ResponseWriter, req *http.Request, data any) {
+// httpStatusFor maps a framework Error to an HTTP status code.
+// Unknown error values fall through to 500.
+func httpStatusFor(err error) int {
+	switch err {
+	case ErrPermissionDenied:
+		return http.StatusForbidden
+	case ErrRecordNotFound:
+		return http.StatusNotFound
+	case ErrPayloadInvalid:
+		return http.StatusBadRequest
+	case ErrCreateFailed, ErrUpdateFailed, ErrDeleteFailed, ErrUnavailable:
+		return http.StatusInternalServerError
+	}
+	return http.StatusInternalServerError
+}
+
+func (r *Resource) Respond(res http.ResponseWriter, req *http.Request, data any) {
 	if r.responder != nil {
 		r.responder.Respond(res, req, data)
 		return
 	}
 	res.Header().Set("Content-Type", "application/json")
 	if err, ok := data.(error); ok {
-		res.WriteHeader(http.StatusServiceUnavailable)
-		res.Write([]byte(err.Error()))
+		res.WriteHeader(httpStatusFor(err))
+		_ = json.NewEncoder(res).Encode(Error{
+			Code:   errorCode(err),
+			Reason: err.Error(),
+		})
 		return
 	}
 	json.NewEncoder(res).Encode(data)
 }
 
-func (r *Resource[T]) Create(res http.ResponseWriter, req *http.Request) {
+// errorCode returns the framework Error code if err is one, otherwise 0.
+func errorCode(err error) int {
+	if e, ok := err.(Error); ok {
+		return e.Code
+	}
+	return 0
+}
+
+func (r *Resource) Create(res http.ResponseWriter, req *http.Request) {
 	var (
 		err          error
-		modelValue   T
+		modelValue   any
 		runtimeScope *RuntimeScope
 	)
-	if err = json.NewDecoder(req.Body).Decode(&modelValue); err != nil {
+	modelValue = reflect.New(r.model.ModelType()).Interface()
+	if err = json.NewDecoder(req.Body).Decode(modelValue); err != nil {
 		r.Respond(res, req, ErrPayloadInvalid)
 		return
 	}
@@ -250,7 +298,7 @@ func (r *Resource[T]) Create(res http.ResponseWriter, req *http.Request) {
 	}
 	runtimeScope.Scenario = schema.ScenarioCreate
 	ctx := WithRuntimeScope(req.Context(), runtimeScope)
-	if _, err = r.model.Create(ctx, &modelValue); err != nil {
+	if _, err = r.model.Create(ctx, modelValue); err != nil {
 		r.Respond(res, req, err)
 		return
 	}
@@ -259,14 +307,14 @@ func (r *Resource[T]) Create(res http.ResponseWriter, req *http.Request) {
 	})
 }
 
-func (r *Resource[T]) Update(res http.ResponseWriter, req *http.Request) {
+func (r *Resource) Update(res http.ResponseWriter, req *http.Request) {
 	var (
 		err          error
 		buf          []byte
 		primaryKey   string
 		runtimeScope *RuntimeScope
 	)
-	modelValue := new(T)
+	modelValue := reflect.New(r.model.ModelType()).Interface()
 	mapValue := make(map[string]any)
 	if buf, err = io.ReadAll(req.Body); err != nil {
 		r.Respond(res, req, ErrPayloadInvalid)
@@ -293,15 +341,15 @@ func (r *Resource[T]) Update(res http.ResponseWriter, req *http.Request) {
 	}
 	var primaryKeyValue any
 	if primaryKeyValue, err = r.model.Update(ctx, primaryKey, modelValue, columns...); err != nil {
-		r.Respond(res, req, ErrUpdateFailed)
-	} else {
-		r.Respond(res, req, UpdateResult{
-			ID: primaryKeyValue,
-		})
+		r.Respond(res, req, err)
+		return
 	}
+	r.Respond(res, req, UpdateResult{
+		ID: primaryKeyValue,
+	})
 }
 
-func (r *Resource[T]) Delete(res http.ResponseWriter, req *http.Request) {
+func (r *Resource) Delete(res http.ResponseWriter, req *http.Request) {
 	var (
 		err          error
 		runtimeScope *RuntimeScope
@@ -315,19 +363,19 @@ func (r *Resource[T]) Delete(res http.ResponseWriter, req *http.Request) {
 	primaryKey := r.findPrimaryKey(req, schema.ScenarioDelete)
 	var primaryKeyValue any
 	if primaryKeyValue, err = r.model.Delete(ctx, primaryKey); err != nil {
-		r.Respond(res, req, ErrDeleteFailed)
-	} else {
-		r.Respond(res, req, DeletedResult{
-			ID: primaryKeyValue,
-		})
+		r.Respond(res, req, err)
+		return
 	}
+	r.Respond(res, req, DeletedResult{
+		ID: primaryKeyValue,
+	})
 }
 
-func (r *Resource[T]) Detail(res http.ResponseWriter, req *http.Request) {
+func (r *Resource) Detail(res http.ResponseWriter, req *http.Request) {
 	var (
 		err          error
 		schemas      []schema.Schema
-		modelValue   *T
+		modelValue   any
 		valueFormat  string
 		runtimeScope *RuntimeScope
 	)
@@ -344,7 +392,12 @@ func (r *Resource[T]) Detail(res http.ResponseWriter, req *http.Request) {
 	runtimeScope.Schemas = schemas
 	valueFormat = req.URL.Query().Get(QueryParamFormat)
 	if modelValue, err = r.model.Detail(ctx, r.findPrimaryKey(req, schema.ScenarioDetail)); err != nil {
-		r.Respond(res, req, ErrRecordNotFound)
+		// 框架未命中的"未找到"统一映射成 ErrRecordNotFound（404）；
+		// 其它 DB/业务错误按原样上抛，由 Respond 映射状态码。
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = ErrRecordNotFound
+		}
+		r.Respond(res, req, err)
 		return
 	}
 	if r.formatter != nil {
@@ -354,12 +407,12 @@ func (r *Resource[T]) Detail(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
+func (r *Resource) Search(res http.ResponseWriter, req *http.Request) {
 	var (
 		err           error
 		pageIndex     int
 		pageSize      int
-		modelValues   []*T
+		modelValues   any
 		totalCount    int64
 		valueFormat   string
 		runtimeScope  *RuntimeScope
@@ -398,7 +451,7 @@ func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
 		queryBuilder.Where(TenantId, query.OpEq, runtimeScope.TenantID)
 	}
 	if totalCount, modelValues, err = r.model.Paginate(ctx, pageIndex, pageSize, queryBuilder); err != nil {
-		r.Respond(res, req, ErrUnavailable)
+		r.Respond(res, req, err)
 		return
 	}
 	result := &PageResult{
@@ -414,10 +467,10 @@ func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
 	r.Respond(res, req, result)
 }
 
-func (r *Resource[T]) Export(res http.ResponseWriter, req *http.Request) {
+func (r *Resource) Export(res http.ResponseWriter, req *http.Request) {
 	var (
 		err          error
-		modelValues  []*T
+		modelValues  any
 		schemas      []schema.Schema
 		runtimeScope *RuntimeScope
 	)
@@ -440,6 +493,8 @@ func (r *Resource[T]) Export(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if r.formatter == nil {
+		// 正常情况下 Register() 不会把 Export 路由挂载在没有 formatter 的 Resource 上；
+		// 这里做兜底，防止误调。
 		r.Respond(res, req, ErrUnavailable)
 		return
 	}
@@ -476,12 +531,8 @@ func (r *Resource[T]) Export(res http.ResponseWriter, req *http.Request) {
 	writer.Flush()
 }
 
-func (r *Resource[T]) OpenApi(res http.ResponseWriter, req *http.Request) {
-	var (
-		err  error
-		spec *openapi.Spec
-	)
-	if spec, err = openapi.NewGenerator().Generate(
+func (r *Resource) OpenApi(res http.ResponseWriter, req *http.Request) {
+	spec, err := openapi.NewGenerator().Generate(
 		req.Context(),
 		r.model.GetDB(),
 		openapi.Config{
@@ -502,22 +553,28 @@ func (r *Resource[T]) OpenApi(res http.ResponseWriter, req *http.Request) {
 				schema.ScenarioExport,
 			},
 			BuildUri: r.buildUri,
-			Model:    any((*T)(nil)),
+			Model:    reflect.New(r.model.ModelType()).Interface(),
 		},
-	); err == nil {
-		res.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(res).Encode(spec)
-	} else {
-		r.Respond(res, req, err)
+	)
+	res.Header().Set("Content-Type", "application/json")
+	if err != nil {
+		// OpenAPI 端点始终返回 JSON；错误体同样序列化为 JSON 对象。
+		res.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(res).Encode(Error{
+			Code:   0,
+			Reason: err.Error(),
+		})
+		return
 	}
+	_ = json.NewEncoder(res).Encode(spec)
 }
 
-func (r *Resource[T]) ModelValue() *Model[T] {
+func (r *Resource) ModelValue() *Model {
 	return r.model
 }
 
-func NewResource[T any](model *Model[T], cfg ResourceConfig) *Resource[T] {
-	return &Resource[T]{
+func NewResource(model *Model, cfg ResourceConfig) *Resource {
+	return &Resource{
 		model:         model,
 		router:        cfg.Router,
 		responder:     cfg.Responder,
@@ -528,9 +585,10 @@ func NewResource[T any](model *Model[T], cfg ResourceConfig) *Resource[T] {
 	}
 }
 
-func NewResourceWithOptions[T any](cfg ResourceConfig, opts ...Option) (resource *Resource[T], err error) {
-	var modelValue *Model[T]
-	modelValue, err = NewModel[T](opts...)
+// NewResourceWithOptions 根据任意模型实例(或 reflect.Type)一步创建并注册 Resource
+func NewResourceWithOptions(model any, cfg ResourceConfig, opts ...Option) (resource *Resource, err error) {
+	var modelValue *Model
+	modelValue, err = NewModel(model, opts...)
 	if err != nil {
 		return
 	}

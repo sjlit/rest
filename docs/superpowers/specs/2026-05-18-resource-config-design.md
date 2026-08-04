@@ -2,7 +2,7 @@
 
 ## Problem
 
-Current `Resource[T]` initialization uses a generic option pattern:
+Current `TypedResource[T]` initialization uses a generic option pattern:
 
 ```go
 userResource := rest.NewResource(userModel,
@@ -28,7 +28,7 @@ Replace the generic `ResourceOption[T]` functional-option pattern with a plain *
 
 Delete from `resource.go`:
 
-- `type ResourceOption[T any] func(*Resource[T])`
+- `type ResourceOption[T any] func(*TypedResource[T])`
 - `func WithRouter[T any](router Router) ResourceOption[T]`
 - `func WithResponder[T any](responder Responder) ResourceOption[T]`
 - `func WithFormatter[T any](formatter *formats.Formatter) ResourceOption[T]`
@@ -55,11 +55,11 @@ type ResourceConfig struct {
 
 ```go
 // Old (removed):
-// func NewResource[T any](model *Model[T], opts ...ResourceOption[T]) *Resource[T]
+// func NewTypedResource[T any](model *TypedModel[T], opts ...ResourceOption[T]) *TypedResource[T]
 
 // New:
-func NewResource[T any](model *Model[T], cfg ResourceConfig) *Resource[T] {
-    return &Resource[T]{
+func NewTypedResource[T any](model *TypedModel[T], cfg ResourceConfig) *TypedResource[T] {
+    return &TypedResource[T]{
         model:         model,
         router:        cfg.Router,
         responder:     cfg.Responder,
@@ -71,9 +71,9 @@ func NewResource[T any](model *Model[T], cfg ResourceConfig) *Resource[T] {
 }
 ```
 
-#### 4. Preserve `Resource[T]` internals
+#### 4. Preserve `TypedResource[T]` internals
 
-`Resource[T]` struct and all methods (`Register`, `Create`, `Update`, `Delete`, `Detail`, `Search`, `Export`, `OpenApi`, `Respond`, `buildUri`, `buildQuery`, `findPrimaryKey`, `getRuntimeScope`) remain unchanged.
+`TypedResource[T]` struct and all methods (`Register`, `Create`, `Update`, `Delete`, `Detail`, `Search`, `Export`, `OpenApi`, `Respond`, `buildUri`, `buildQuery`, `findPrimaryKey`, `getRuntimeScope`) remain unchanged.
 
 ### New Usage
 

@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"reflect"
 	"slices"
 	"strconv"
@@ -30,43 +31,88 @@ func decodeCursor(cursor string) (int, error) {
 	return strconv.Atoi(string(b))
 }
 
-type Model[T any] struct {
+// Model 是模型类型在运行时才确定的动态模型, 支持把任意结构体(实例或 reflect.Type)交给它管理。
+// 若希望获得编译期类型安全, 请使用 TypedModel[T]。
+type Model struct {
 	db          *gorm.DB
 	opts        *options
 	naming      Naming
 	primaryKey  string
-	globalHooks *modelHooks // NewModel 时从全局注册表快照
-	localHooks  *modelHooks // 实例级追加
+	modelType   reflect.Type // 归一化后的结构体类型
+	globalHooks *modelHooks  // NewModel 时从全局注册表快照
+	localHooks  *modelHooks  // 实例级追加
 }
 
-func (m *Model[T]) GetDB() *gorm.DB {
-	return m.db
+// normalizeModelType 将实例(值或指针)或 reflect.Type 归一化为结构体类型
+func normalizeModelType(model any) (reflect.Type, error) {
+	if model == nil {
+		return nil, fmt.Errorf("rest: model is nil")
+	}
+	t, ok := model.(reflect.Type)
+	if !ok {
+		t = reflect.TypeOf(model)
+	}
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("rest: model must be a struct, got %s", t.Kind())
+	}
+	return t, nil
 }
 
-func (m *Model[T]) HasScenario(s string) bool {
+// checkModelType 校验调用方传入的模型实例与 modelType 一致
+func (m *Model) checkModelType(model any) error {
+	if model == nil {
+		return fmt.Errorf("rest: model is nil")
+	}
+	t := reflect.TypeOf(model)
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if t != m.modelType {
+		return fmt.Errorf("rest: model type mismatch: expected %s, got %s", m.modelType, t)
+	}
+	return nil
+}
+
+func (m *Model) GetDB() *gorm.DB {
+	db := m.db.Session(&gorm.Session{NewDB: true})
+	instance := reflect.New(m.modelType).Interface()
+	db = db.Model(instance)
+	// Model() 不会触发 Schema 解析, 显式 Parse 以保证 Statement.Schema 可用
+	_ = db.Statement.Parse(instance)
+	return db
+}
+
+func (m *Model) HasScenario(s string) bool {
 	if len(m.opts.scenarios) == 0 {
 		return true
 	}
 	return slices.Contains(m.opts.scenarios, s)
 }
 
-func (m *Model[T]) GetPrimaryKey() string {
+func (m *Model) GetPrimaryKey() string {
 	return m.primaryKey
 }
 
-func (m *Model[T]) OpenAPIEnabled() bool {
+func (m *Model) OpenAPIEnabled() bool {
 	return m.opts.enableOpenAPI
 }
 
-func (m *Model[T]) GetNaming() Naming {
+func (m *Model) GetNaming() Naming {
 	return m.naming
 }
 
-func (m *Model[T]) GetFields() []*gormSchema.Field {
+func (m *Model) ModelType() reflect.Type {
+	return m.modelType
+}
+
+func (m *Model) GetFields() []*gormSchema.Field {
 	return m.GetDB().Statement.Schema.Fields
 }
 
-func (m *Model[T]) GetFieldValue(refValue reflect.Value, column string) any {
+func (m *Model) GetFieldValue(refValue reflect.Value, column string) any {
 	var (
 		rawField *gormSchema.Field
 	)
@@ -88,7 +134,7 @@ func (m *Model[T]) GetFieldValue(refValue reflect.Value, column string) any {
 	return targetValue.Interface()
 }
 
-func (m *Model[T]) SetFieldValue(stmt *gorm.Statement, refValue reflect.Value, column string, value any) {
+func (m *Model) SetFieldValue(stmt *gorm.Statement, refValue reflect.Value, column string, value any) {
 	var (
 		rawField *gormSchema.Field
 	)
@@ -110,51 +156,51 @@ func (m *Model[T]) SetFieldValue(stmt *gorm.Statement, refValue reflect.Value, c
 	targetValue.Set(reflect.ValueOf(value))
 }
 
-func (m *Model[T]) RegisterBeforeCreate(fn BeforeCreateHook[T]) {
+func (m *Model) RegisterBeforeCreate(fn BeforeCreateFunc) {
 	m.initLocalHooks()
-	m.localHooks.beforeCreate = append(m.localHooks.beforeCreate, wrapBeforeHook(fn))
+	m.localHooks.beforeCreate = append(m.localHooks.beforeCreate, erasedBeforeHookFunc(fn))
 }
 
-func (m *Model[T]) RegisterAfterCreate(fn AfterCreateHook[T]) {
+func (m *Model) RegisterAfterCreate(fn AfterCreateFunc) {
 	m.initLocalHooks()
-	m.localHooks.afterCreate = append(m.localHooks.afterCreate, wrapAfterHook(fn))
+	m.localHooks.afterCreate = append(m.localHooks.afterCreate, erasedAfterHookFunc(fn))
 }
 
-func (m *Model[T]) RegisterBeforeUpdate(fn BeforeUpdateHook[T]) {
+func (m *Model) RegisterBeforeUpdate(fn BeforeUpdateFunc) {
 	m.initLocalHooks()
-	m.localHooks.beforeUpdate = append(m.localHooks.beforeUpdate, wrapBeforeHook(fn))
+	m.localHooks.beforeUpdate = append(m.localHooks.beforeUpdate, erasedBeforeHookFunc(fn))
 }
 
-func (m *Model[T]) RegisterAfterUpdate(fn AfterUpdateHook[T]) {
+func (m *Model) RegisterAfterUpdate(fn AfterUpdateFunc) {
 	m.initLocalHooks()
-	m.localHooks.afterUpdate = append(m.localHooks.afterUpdate, wrapAfterHook(fn))
+	m.localHooks.afterUpdate = append(m.localHooks.afterUpdate, erasedAfterHookFunc(fn))
 }
 
-func (m *Model[T]) RegisterAfterSaved(fn AfterSavedHook[T]) {
+func (m *Model) RegisterAfterSaved(fn AfterSavedFunc) {
 	m.initLocalHooks()
-	m.localHooks.afterSaved = append(m.localHooks.afterSaved, wrapAfterHook(fn))
+	m.localHooks.afterSaved = append(m.localHooks.afterSaved, erasedAfterHookFunc(fn))
 }
 
-func (m *Model[T]) RegisterBeforeDelete(fn BeforeDeleteHook[T]) {
+func (m *Model) RegisterBeforeDelete(fn BeforeDeleteFunc) {
 	m.initLocalHooks()
-	m.localHooks.beforeDelete = append(m.localHooks.beforeDelete, wrapBeforeHook(fn))
+	m.localHooks.beforeDelete = append(m.localHooks.beforeDelete, erasedBeforeHookFunc(fn))
 }
 
-func (m *Model[T]) RegisterAfterDelete(fn AfterDeleteHook[T]) {
+func (m *Model) RegisterAfterDelete(fn AfterDeleteFunc) {
 	m.initLocalHooks()
-	m.localHooks.afterDelete = append(m.localHooks.afterDelete, wrapAfterDeleteHook(fn))
+	m.localHooks.afterDelete = append(m.localHooks.afterDelete, erasedAfterDeleteHookFunc(fn))
 }
 
-func (m *Model[T]) initLocalHooks() {
+func (m *Model) initLocalHooks() {
 	if m.localHooks == nil {
 		m.localHooks = &modelHooks{}
 	}
 }
 
-func (m *Model[T]) runBeforeHooks(
+func (m *Model) runBeforeHooks(
 	ctx context.Context,
 	db *gorm.DB,
-	model *T,
+	model any,
 	globalFns, localFns []erasedBeforeHookFunc,
 ) error {
 	for _, fns := range [][]erasedBeforeHookFunc{globalFns, localFns} {
@@ -167,10 +213,10 @@ func (m *Model[T]) runBeforeHooks(
 	return nil
 }
 
-func (m *Model[T]) runAfterHooks(
+func (m *Model) runAfterHooks(
 	ctx context.Context,
 	db *gorm.DB,
-	model *T,
+	model any,
 	diffAttrs []*DiffAttr,
 	globalFns, localFns []erasedAfterHookFunc,
 ) {
@@ -183,10 +229,10 @@ func (m *Model[T]) runAfterHooks(
 	}
 }
 
-func (m *Model[T]) runAfterDeleteHooks(
+func (m *Model) runAfterDeleteHooks(
 	ctx context.Context,
 	db *gorm.DB,
-	model *T,
+	model any,
 	globalFns, localFns []erasedAfterDeleteHookFunc,
 ) {
 	for _, fns := range [][]erasedAfterDeleteHookFunc{globalFns, localFns} {
@@ -198,9 +244,12 @@ func (m *Model[T]) runAfterDeleteHooks(
 	}
 }
 
-func (m *Model[T]) Create(ctx context.Context, model *T) (diffAttrs []*DiffAttr, err error) {
+func (m *Model) Create(ctx context.Context, model any) (diffAttrs []*DiffAttr, err error) {
 	if !m.HasScenario(schema.ScenarioCreate) {
 		return nil, ErrPermissionDenied
+	}
+	if err = m.checkModelType(model); err != nil {
+		return nil, err
 	}
 	var (
 		schemas []schema.Schema
@@ -255,18 +304,21 @@ func (m *Model[T]) Create(ctx context.Context, model *T) (diffAttrs []*DiffAttr,
 		m.globalHooks.afterSaved, m.localHooks.afterSaved)
 
 	// 兼容现有接口式 hook
-	if ac, ok := any(model).(AfterCreated); ok {
+	if ac, ok := model.(AfterCreated); ok {
 		ac.AfterCreated(ctx, m.GetDB(), diffAttrs)
 	}
-	if as, ok := any(model).(AfterSaved); ok {
+	if as, ok := model.(AfterSaved); ok {
 		as.AfterSaved(ctx, m.GetDB(), diffAttrs)
 	}
 	return
 }
 
-func (m *Model[T]) Update(ctx context.Context, primaryKey any, model *T, columns ...string) (primaryKeyValue any, err error) {
+func (m *Model) Update(ctx context.Context, primaryKey any, model any, columns ...string) (primaryKeyValue any, err error) {
 	if !m.HasScenario(schema.ScenarioUpdate) {
 		return nil, ErrPermissionDenied
+	}
+	if err = m.checkModelType(model); err != nil {
+		return nil, err
 	}
 	var (
 		updates        map[string]any
@@ -293,7 +345,7 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model *T, columns
 		ctx = WithRuntimeScope(ctx, runtimeScope)
 	}
 	err = m.GetDB().WithContext(ctx).Transaction(func(tx *gorm.DB) (errTx error) {
-		previousModel := new(T)
+		previousModel := reflect.New(m.modelType).Interface()
 		if errTx = tx.Where(map[string]any{m.primaryKey: primaryKey}).First(previousModel).Error; errTx != nil {
 			return errTx
 		}
@@ -348,16 +400,16 @@ func (m *Model[T]) Update(ctx context.Context, primaryKey any, model *T, columns
 		m.globalHooks.afterUpdate, m.localHooks.afterUpdate)
 	m.runAfterHooks(ctx, m.GetDB(), model, diffAttrs,
 		m.globalHooks.afterSaved, m.localHooks.afterSaved)
-	if au, ok := any(model).(AfterUpdated); ok {
+	if au, ok := model.(AfterUpdated); ok {
 		au.AfterUpdated(ctx, m.GetDB(), diffAttrs)
 	}
-	if as, ok := any(model).(AfterSaved); ok {
+	if as, ok := model.(AfterSaved); ok {
 		as.AfterSaved(ctx, m.GetDB(), diffAttrs)
 	}
 	return
 }
 
-func (m *Model[T]) Delete(ctx context.Context, primaryKey any) (primaryKeyValue any, err error) {
+func (m *Model) Delete(ctx context.Context, primaryKey any) (primaryKeyValue any, err error) {
 	if !m.HasScenario(schema.ScenarioDelete) {
 		return nil, ErrPermissionDenied
 	}
@@ -370,7 +422,7 @@ func (m *Model[T]) Delete(ctx context.Context, primaryKey any) (primaryKeyValue 
 		}
 		ctx = WithRuntimeScope(ctx, runtimeScope)
 	}
-	model := new(T)
+	model := reflect.New(m.modelType).Interface()
 	err = m.GetDB().WithContext(ctx).Transaction(func(tx *gorm.DB) (errTx error) {
 		// 先查询完整记录
 		if errTx = tx.Where(map[string]any{m.primaryKey: primaryKey}).First(model).Error; errTx != nil {
@@ -394,17 +446,17 @@ func (m *Model[T]) Delete(ctx context.Context, primaryKey any) (primaryKeyValue 
 	// AfterDelete hooks
 	m.runAfterDeleteHooks(ctx, m.GetDB(), model, m.globalHooks.afterDelete, m.localHooks.afterDelete)
 	// 兼容现有接口式 hook
-	if ad, ok := any(model).(AfterDeleted); ok {
+	if ad, ok := model.(AfterDeleted); ok {
 		ad.AfterDeleted(ctx, m.GetDB())
 	}
 	return
 }
 
-func (m *Model[T]) Detail(ctx context.Context, primaryKey any) (model *T, err error) {
+func (m *Model) Detail(ctx context.Context, primaryKey any) (model any, err error) {
 	if !m.HasScenario(schema.ScenarioDetail) {
 		return model, ErrPermissionDenied
 	}
-	model = new(T)
+	model = reflect.New(m.modelType).Interface()
 	runtimeScope := RuntimeScopeFromContext(ctx)
 	if runtimeScope == nil {
 		runtimeScope = &RuntimeScope{
@@ -425,14 +477,15 @@ func (m *Model[T]) Detail(ctx context.Context, primaryKey any) (model *T, err er
 	return model, nil
 }
 
-func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *query.Builder) ([]*T, error) {
+func (m *Model) List(ctx context.Context, offset, limit int, queryBuilder *query.Builder) (any, error) {
 	if !m.HasScenario(schema.ScenarioSearch) {
 		return nil, ErrPermissionDenied
 	}
 	var (
-		model T
+		model any
 		err   error
 	)
+	model = reflect.New(m.modelType).Elem().Interface()
 	listBuilder := query.NewBuilder()
 	if queryBuilder != nil {
 		listBuilder = queryBuilder.Clone()
@@ -457,20 +510,23 @@ func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *qu
 	}
 	searchDB := m.applyPreloads(ctx, m.GetDB().WithContext(ctx), runtimeScope.Schemas, schema.ScenarioList, make(map[string]bool), "")
 	search := query.New(searchDB, model, listBuilder)
-	values := make([]*T, 0)
-	if err = search.All(ctx, &values); err != nil {
+	values := reflect.New(reflect.SliceOf(reflect.PointerTo(m.modelType)))
+	if err = search.All(ctx, values.Interface()); err != nil {
 		return nil, err
 	}
-	return values, nil
+	return values.Elem().Interface(), nil
 }
 
-func (m *Model[T]) Count(ctx context.Context, queryBuilder *query.Builder) (int64, error) {
-	var model T
+func (m *Model) Count(ctx context.Context, queryBuilder *query.Builder) (int64, error) {
+	if queryBuilder == nil {
+		queryBuilder = query.NewBuilder()
+	}
+	model := reflect.New(m.modelType).Elem().Interface()
 	search := query.New(m.GetDB(), model, queryBuilder)
 	return search.Count(ctx)
 }
 
-func (m *Model[T]) Paginate(ctx context.Context, page, size int, queryBuilder *query.Builder) (int64, []*T, error) {
+func (m *Model) Paginate(ctx context.Context, page, size int, queryBuilder *query.Builder) (int64, any, error) {
 	if page < 0 {
 		page = 0
 	}
@@ -489,7 +545,7 @@ func (m *Model[T]) Paginate(ctx context.Context, page, size int, queryBuilder *q
 	return totalCount, data, nil
 }
 
-func (m *Model[T]) Cursor(ctx context.Context, cursor string, limit int, queryBuilder *query.Builder) (nextCursor string, hasMore bool, data []*T, err error) {
+func (m *Model) Cursor(ctx context.Context, cursor string, limit int, queryBuilder *query.Builder) (nextCursor string, hasMore bool, data any, err error) {
 	offset, err := decodeCursor(cursor)
 	if err != nil {
 		return
@@ -501,17 +557,16 @@ func (m *Model[T]) Cursor(ctx context.Context, cursor string, limit int, queryBu
 	if err != nil {
 		return
 	}
-	hasMore = len(data) > limit
+	rv := reflect.ValueOf(data)
+	hasMore = rv.Len() > limit
 	if hasMore {
-		data = data[:limit]
-	}
-	if hasMore {
+		data = rv.Slice(0, limit).Interface()
 		nextCursor = encodeCursor(offset + limit)
 	}
 	return
 }
 
-func (m *Model[T]) applyPreloads(ctx context.Context, db *gorm.DB, schemas []schema.Schema, scenario string, visited map[string]bool, prefix string) *gorm.DB {
+func (m *Model) applyPreloads(ctx context.Context, db *gorm.DB, schemas []schema.Schema, scenario string, visited map[string]bool, prefix string) *gorm.DB {
 	for _, s := range schemas {
 		if s.Relations.Type == "" {
 			continue
@@ -540,25 +595,31 @@ func (m *Model[T]) applyPreloads(ctx context.Context, db *gorm.DB, schemas []sch
 	return db
 }
 
-func NewModel[T any](opts ...Option) (v *Model[T], err error) {
-	v = &Model[T]{
-		opts: newOptions(opts...),
+// NewModel 为任意结构体(实例或 reflect.Type)创建动态模型
+func NewModel(model any, opts ...Option) (v *Model, err error) {
+	var modelType reflect.Type
+	if modelType, err = normalizeModelType(model); err != nil {
+		return nil, err
+	}
+	v = &Model{
+		opts:      newOptions(opts...),
+		modelType: modelType,
 	}
 	v.db = v.opts.db.Session(&gorm.Session{
 		NewDB: true,
 	})
-	var model T
+	instance := reflect.New(modelType).Interface()
 	if v.opts.moduleName == "" {
-		if mm, ok := any(model).(ModuleNamer); ok {
+		if mm, ok := instance.(ModuleNamer); ok {
 			v.opts.moduleName = mm.ModuleName()
 		}
 	}
 	if len(v.opts.scenarios) == 0 {
-		if sp, ok := any(model).(ScenarioProvider); ok {
+		if sp, ok := instance.(ScenarioProvider); ok {
 			v.opts.scenarios = sp.Scenarios()
 		}
 	}
-	if err = v.db.Statement.Parse(&model); err != nil {
+	if err = v.db.Statement.Parse(instance); err != nil {
 		return
 	}
 	for _, field := range v.db.Statement.Schema.Fields {
@@ -567,10 +628,10 @@ func NewModel[T any](opts ...Option) (v *Model[T], err error) {
 			break
 		}
 	}
-	if err = v.db.AutoMigrate(model); err != nil {
+	if err = v.db.AutoMigrate(instance); err != nil {
 		return
 	}
-	if v.naming.TableName, err = schema.AutoMigrate(v.db.Statement.Context, v.GetDB(), model, v.opts.moduleName); err != nil {
+	if v.naming.TableName, err = schema.AutoMigrate(v.db.Statement.Context, v.GetDB(), instance, v.opts.moduleName); err != nil {
 		return
 	}
 	singularizeTable := inflector.Singularize(v.naming.TableName)

@@ -33,7 +33,7 @@ Replace lines 21-69 in `resource.go`:
 ```go
 // Old lines 21-69 to delete entirely:
 // type (
-//     ResourceOption[T any] func(*Resource[T])
+//     ResourceOption[T any] func(*TypedResource[T])
 //     ...
 // )
 // func WithRouter[T any](...) ...
@@ -57,7 +57,7 @@ Resulting structure at the top of `resource.go`:
 ```go
 type (
     Resource[T any] struct {
-        model         *Model[T]
+        model         *TypedModel[T]
         prefix        string
         router        Router
         responder     Responder
@@ -83,8 +83,8 @@ Replace lines 535-543 in `resource.go`:
 
 ```go
 // Old:
-// func NewResource[T any](model *Model[T], opts ...ResourceOption[T]) *Resource[T] {
-//     r := &Resource[T]{
+// func NewTypedResource[T any](model *TypedModel[T], opts ...ResourceOption[T]) *TypedResource[T] {
+//     r := &TypedResource[T]{
 //         model: model,
 //     }
 //     for _, cb := range opts {
@@ -94,8 +94,8 @@ Replace lines 535-543 in `resource.go`:
 // }
 
 // New:
-func NewResource[T any](model *Model[T], cfg ResourceConfig) *Resource[T] {
-    return &Resource[T]{
+func NewTypedResource[T any](model *TypedModel[T], cfg ResourceConfig) *TypedResource[T] {
+    return &TypedResource[T]{
         model:         model,
         router:        cfg.Router,
         responder:     cfg.Responder,
@@ -297,6 +297,6 @@ If any fixes were needed, commit them. Otherwise this task is complete.
 **Placeholder scan:** None found. Every step contains exact code and commands.
 
 **Type consistency:**
-- `ResourceConfig` fields match `Resource[T]` fields exactly
-- `NewResource[T]` returns `*Resource[T]` unchanged
+- `ResourceConfig` fields match `TypedResource[T]` fields exactly
+- `NewTypedResource[T]` returns `*TypedResource[T]` unchanged
 - Field names consistent across struct definition, assignment, and usage

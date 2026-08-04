@@ -22,7 +22,7 @@ func setupModelTestDB(t *testing.T) *gorm.DB {
 
 func TestApplyPreloadsBasic(t *testing.T) {
 	db := setupModelTestDB(t)
-	model, err := NewModel[hookTestModel](WithDB(db), WithModuleName("test"))
+	model, err := NewTypedModel[hookTestModel](WithDB(db), WithModuleName("test"))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}
@@ -46,7 +46,7 @@ type updateTestModel struct {
 
 func TestUpdateSkipsDisabledFields(t *testing.T) {
 	db := setupModelTestDB(t)
-	m, err := NewModel[updateTestModel](WithDB(db), WithModuleName("upd_test"))
+	m, err := NewTypedModel[updateTestModel](WithDB(db), WithModuleName("upd_test"))
 	if err != nil {
 		t.Fatalf("NewModel: %v", err)
 	}

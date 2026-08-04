@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 为 `rest` 框架的每个 `Resource[T]` 自动生成 OpenAPI 3.0 JSON 规范，通过运行时 HTTP 端点 `/{prefix}/openapi.json` 提供访问。
+**Goal:** 为 `rest` 框架的每个 `TypedResource[T]` 自动生成 OpenAPI 3.0 JSON 规范，通过运行时 HTTP 端点 `/{prefix}/openapi.json` 提供访问。
 
 **Architecture:** 新增独立的 `openapi/` 包，内含最小化 OpenAPI 3.0 结构体与 `Generator`。`Generator` 接收 `Config`（含 `buildUri` 回调），递归查询 `schema.GetVisibleSchemas` 构建 `Paths` 与 `Components/schemas`。`Resource.Register()` 在注册业务路由后，若启用 `WithOpenAPI(true)`，则一次性生成 Spec 并缓存为 `[]byte`，再注册 `GET /{prefix}/openapi.json` 路由直接返回。
 
@@ -18,7 +18,7 @@
 | `openapi/generator.go` | `Generator` 核心：Schema→OpenAPI 映射、递归关联处理、循环引用检测、路径构建 |
 | `openapi/generator_test.go` | 单元测试：映射矩阵、循环引用、完整 Spec 生成断言 |
 | `options.go` | 修改：新增 `enableOpenAPI` 字段与 `WithOpenAPI` Option |
-| `resource.go` | 修改：`Resource[T]` 新增 `openAPISpec []byte`；`Register()` 末尾条件注册 `/openapi.json`；新增 `ServeOpenAPI` handler |
+| `resource.go` | 修改：`TypedResource[T]` 新增 `openAPISpec []byte`；`Register()` 末尾条件注册 `/openapi.json`；新增 `ServeOpenAPI` handler |
 | `integration_test.go` | 扩展：新增基于内存 SQLite 的集成测试，验证 `/openapi.json` 返回结构与字段 |
 
 ---
@@ -845,11 +845,11 @@ git commit -m "feat: add WithOpenAPI option"
 
 - [ ] **Step 1: Add `openAPISpec` field and `ServeOpenAPI` handler**
 
-Add `openAPISpec []byte` to `Resource[T]` struct:
+Add `openAPISpec []byte` to `TypedResource[T]` struct:
 
 ```go
 type Resource[T any] struct {
-    model         *Model[T]
+    model         *TypedModel[T]
     prefix        string
     router        Router
     responder     Responder
@@ -863,7 +863,7 @@ type Resource[T any] struct {
 Add `ServeOpenAPI` method after `Register()`:
 
 ```go
-func (r *Resource[T]) ServeOpenAPI(res http.ResponseWriter, req *http.Request) {
+func (r *TypedResource[T]) ServeOpenAPI(res http.ResponseWriter, req *http.Request) {
     if len(r.openAPISpec) == 0 {
         res.WriteHeader(http.StatusNotFound)
         return
@@ -878,7 +878,7 @@ func (r *Resource[T]) ServeOpenAPI(res http.ResponseWriter, req *http.Request) {
 At the end of `Register()`, after the existing scenario registrations, add:
 
 ```go
-func (r *Resource[T]) Register() {
+func (r *TypedResource[T]) Register() {
     // ... existing registrations ...
 
     if r.model.opts.enableOpenAPI {
@@ -926,14 +926,14 @@ import (
 )
 ```
 
-Note: `r.model.opts` is currently unexported (`opts *options`). You may need to add a getter like `func (m *Model[T]) IsOpenAPIEnabled() bool` on `model.go`, or make `opts` accessible. The simplest path: add `OpenAPIEnabled() bool` to `Model[T]`.
+Note: `r.model.opts` is currently unexported (`opts *options`). You may need to add a getter like `func (m *TypedModel[T]) IsOpenAPIEnabled() bool` on `model.go`, or make `opts` accessible. The simplest path: add `OpenAPIEnabled() bool` to `TypedModel[T]`.
 
 - [ ] **Step 3: Add `OpenAPIEnabled` getter to `model.go`**
 
 In `model.go`, add:
 
 ```go
-func (m *Model[T]) OpenAPIEnabled() bool {
+func (m *TypedModel[T]) OpenAPIEnabled() bool {
     return m.opts.enableOpenAPI
 }
 ```
@@ -973,7 +973,7 @@ func TestIntegrationOpenAPIEndpoint(t *testing.T) {
         t.Fatalf("failed to migrate: %v", err)
     }
 
-    userModel, err := NewModel[IntegUser](WithDB(db), WithModuleName("integration"), WithOpenAPI(true))
+    userModel, err := NewTypedModel[IntegUser](WithDB(db), WithModuleName("integration"), WithOpenAPI(true))
     if err != nil {
         t.Fatalf("NewModel failed: %v", err)
     }
@@ -1066,7 +1066,7 @@ func TestIntegrationOpenAPIDisabledByDefault(t *testing.T) {
         t.Fatalf("failed to migrate: %v", err)
     }
 
-    userModel, err := NewModel[IntegUser](WithDB(db), WithModuleName("integration"))
+    userModel, err := NewTypedModel[IntegUser](WithDB(db), WithModuleName("integration"))
     if err != nil {
         t.Fatalf("NewModel failed: %v", err)
     }

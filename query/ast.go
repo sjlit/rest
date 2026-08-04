@@ -57,7 +57,7 @@ func (RawExpr) isExpr() {}
 
 // ---- Helpers ----
 
-func Field(name string) Expr         { return FieldExpr{Name: name} }
+func Field(name string) Expr           { return FieldExpr{Name: name} }
 func Count(field string) AggregateExpr { return AggregateExpr{Field: field, Function: "COUNT"} }
 func Sum(field string) AggregateExpr   { return AggregateExpr{Field: field, Function: "SUM"} }
 func Avg(field string) AggregateExpr   { return AggregateExpr{Field: field, Function: "AVG"} }

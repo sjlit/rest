@@ -4,7 +4,7 @@
 
 **Goal:** 为框架增加 Schema 元数据驱动的 GORM Preload 关联查询能力，支持多级嵌套关联自动加载与 Formatter 递归格式化。
 
-**Architecture:** 在 `Schema` 中新增 `Relations Relation` 复合字段存储关联配置；`Model[T]` 在查询前根据可见 Schema 自动递归构建 `db.Preload` 链；`Formatter` 对关联数据递归调用格式化输出。
+**Architecture:** 在 `Schema` 中新增 `Relations Relation` 复合字段存储关联配置；`TypedModel[T]` 在查询前根据可见 Schema 自动递归构建 `db.Preload` 链；`Formatter` 对关联数据递归调用格式化输出。
 
 **Tech Stack:** Go 1.25, GORM v2, SQLite (测试)
 
@@ -360,7 +360,7 @@ func setupModelTestDB(t *testing.T) *gorm.DB {
 
 func TestApplyPreloadsBasic(t *testing.T) {
 	db := setupModelTestDB(t)
-	model, err := NewModel[hookTestModel](WithDB(db), WithModuleName("test"))
+	model, err := NewTypedModel[hookTestModel](WithDB(db), WithModuleName("test"))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}
@@ -390,7 +390,7 @@ Expected: FAIL，`applyPreloads` 方法未定义
 在 `model.go` 中，在 `NewModel` 函数之前新增：
 
 ```go
-func (m *Model[T]) applyPreloads(ctx context.Context, db *gorm.DB, schemas []schema.Schema, scenario string, visited map[string]bool, prefix string) *gorm.DB {
+func (m *TypedModel[T]) applyPreloads(ctx context.Context, db *gorm.DB, schemas []schema.Schema, scenario string, visited map[string]bool, prefix string) *gorm.DB {
 	for _, s := range schemas {
 		if s.Relations.Type == "" {
 			continue
@@ -782,7 +782,7 @@ func TestIntegrationPreloadDetail(t *testing.T) {
 	}
 
 	// 初始化 Schema 元数据
-	userModel, err := NewModel[IntegUser](WithDB(db), WithModuleName("integration"))
+	userModel, err := NewTypedModel[IntegUser](WithDB(db), WithModuleName("integration"))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}
@@ -840,7 +840,7 @@ func TestIntegrationPreloadList(t *testing.T) {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 
-	userModel, err := NewModel[IntegUser](WithDB(db), WithModuleName("integration"))
+	userModel, err := NewTypedModel[IntegUser](WithDB(db), WithModuleName("integration"))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}

@@ -132,5 +132,3 @@ func ModelTiers[T comparable](ctx context.Context, db *gorm.DB, model any, tenan
 	var none T
 	return recursiveTier(none, values), nil
 }
-
-

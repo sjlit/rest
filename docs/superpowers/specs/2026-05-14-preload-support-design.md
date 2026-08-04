@@ -2,7 +2,7 @@
 
 ## 1. 背景与目标
 
-当前框架的 `Model[T]` 仅支持单表 CRUD，无法自动加载关联模型（如 `User` 的 `Orders`）。本设计旨在通过 **Schema 元数据驱动** 的方式，暴露 GORM 的 `Preload` 能力，使所有查询方法（`Detail`/`List`/`Paginate`/`Cursor`）都能自动加载配置的关联数据，并支持**多级嵌套**。
+当前框架的 `TypedModel[T]` 仅支持单表 CRUD，无法自动加载关联模型（如 `User` 的 `Orders`）。本设计旨在通过 **Schema 元数据驱动** 的方式，暴露 GORM 的 `Preload` 能力，使所有查询方法（`Detail`/`List`/`Paginate`/`Cursor`）都能自动加载配置的关联数据，并支持**多级嵌套**。
 
 ### 1.1 设计原则
 - **Schema 驱动**：关联配置集中存储在 `Schema` 元数据中，与字段的 `Rules`、`Attributes` 风格一致
@@ -61,7 +61,7 @@ func parseFieldRelations(field *schema.Field) Relation {
 
 ---
 
-## 4. 查询层集成（Model[T]）
+## 4. 查询层集成（TypedModel[T]）
 
 ### 4.1 applyPreloads 方法
 
@@ -89,7 +89,7 @@ err = db.Where(...).First(model).Error
 5. 使用 `db.Preload(path)` 一次性注册完整链式路径
 
 ```go
-func (m *Model[T]) applyPreloads(ctx context.Context, db *gorm.DB, schemas []schema.Schema, scenario string, visited map[string]bool, prefix string) *gorm.DB {
+func (m *TypedModel[T]) applyPreloads(ctx context.Context, db *gorm.DB, schemas []schema.Schema, scenario string, visited map[string]bool, prefix string) *gorm.DB {
     for _, s := range schemas {
         if s.Relations.Type == "" {
             continue

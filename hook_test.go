@@ -36,7 +36,7 @@ func TestGlobalBeforeCreateBlocks(t *testing.T) {
 	defer func() { globalBeforeCreate = nil }()
 
 	db := setupHookTestDB(t)
-	model, err := NewModel[hookTestModel](WithDB(db), WithModuleName("test"))
+	model, err := NewTypedModel[hookTestModel](WithDB(db), WithModuleName("test"))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestGlobalAfterCreateExecutes(t *testing.T) {
 	defer func() { globalAfterCreate = nil }()
 
 	db := setupHookTestDB(t)
-	model, err := NewModel[hookTestModel](WithDB(db), WithModuleName("test"))
+	model, err := NewTypedModel[hookTestModel](WithDB(db), WithModuleName("test"))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}
@@ -84,7 +84,7 @@ func TestLocalAfterCreateExecutes(t *testing.T) {
 	globalAfterCreate = nil
 
 	db := setupHookTestDB(t)
-	model, err := NewModel[hookTestModel](WithDB(db), WithModuleName("test"))
+	model, err := NewTypedModel[hookTestModel](WithDB(db), WithModuleName("test"))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestCreateHookExecutionOrder(t *testing.T) {
 	defer func() { globalAfterCreate = nil }()
 
 	db := setupHookTestDB(t)
-	model, err := NewModel[hookTestModel](WithDB(db), WithModuleName("test"))
+	model, err := NewTypedModel[hookTestModel](WithDB(db), WithModuleName("test"))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestAfterCreatePanicRecover(t *testing.T) {
 	defer func() { globalAfterCreate = nil }()
 
 	db := setupHookTestDB(t)
-	model, err := NewModel[hookTestModel](WithDB(db), WithModuleName("test"))
+	model, err := NewTypedModel[hookTestModel](WithDB(db), WithModuleName("test"))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestDeleteHookReceivesFullModel(t *testing.T) {
 	defer func() { globalAfterDelete = nil }()
 
 	db := setupHookTestDB(t)
-	model, err := NewModel[hookTestModel](WithDB(db), WithModuleName("test"))
+	model, err := NewTypedModel[hookTestModel](WithDB(db), WithModuleName("test"))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}

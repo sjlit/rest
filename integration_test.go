@@ -38,7 +38,7 @@ func TestIntegrationPreloadDetail(t *testing.T) {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 
-	userModel, err := NewModel[IntegUser](WithDB(db), WithModuleName("integration"))
+	userModel, err := NewTypedModel[IntegUser](WithDB(db), WithModuleName("integration"))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestIntegrationPreloadList(t *testing.T) {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 
-	userModel, err := NewModel[IntegUser](WithDB(db), WithModuleName("integration"))
+	userModel, err := NewTypedModel[IntegUser](WithDB(db), WithModuleName("integration"))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}
@@ -144,10 +144,35 @@ func (tr *testRouter) Handle(method, path string, handler http.HandlerFunc) {
 }
 
 func (tr *testRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	key := r.Method + " " + r.URL.Path
-	if handler, ok := tr.handlers[key]; ok {
+	// 精确匹配优先；否则按方法 + 按段匹配（`:id` 视为通配）。
+	if handler, ok := tr.handlers[r.Method+" "+r.URL.Path]; ok {
 		handler(w, r)
 		return
+	}
+	want := strings.Split(r.URL.Path, "/")
+	for key, handler := range tr.handlers {
+		method, p, ok := strings.Cut(key, " ")
+		if !ok || method != r.Method {
+			continue
+		}
+		parts := strings.Split(p, "/")
+		if len(parts) != len(want) {
+			continue
+		}
+		match := true
+		for i := range parts {
+			if strings.HasPrefix(parts[i], ":") {
+				continue
+			}
+			if parts[i] != want[i] {
+				match = false
+				break
+			}
+		}
+		if match {
+			handler(w, r)
+			return
+		}
 	}
 	http.NotFound(w, r)
 }
@@ -164,13 +189,13 @@ func TestIntegrationOpenAPIEndpoint(t *testing.T) {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 
-	userModel, err := NewModel[IntegUser](WithDB(db), WithModuleName("integration"), WithOpenAPI(true))
+	userModel, err := NewTypedModel[IntegUser](WithDB(db), WithModuleName("integration"), WithOpenAPI(true))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}
 
 	tr := &testRouter{}
-	userResource := NewResource(userModel, ResourceConfig{
+	userResource := NewTypedResource(userModel, ResourceConfig{
 		Router: tr,
 		Prefix: "/api/v1",
 	})
@@ -218,13 +243,13 @@ func TestIntegrationOpenAPIDisabledByDefault(t *testing.T) {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 
-	userModel, err := NewModel[IntegUser](WithDB(db), WithModuleName("integration"))
+	userModel, err := NewTypedModel[IntegUser](WithDB(db), WithModuleName("integration"))
 	if err != nil {
 		t.Fatalf("NewModel failed: %v", err)
 	}
 
 	tr := &testRouter{}
-	userResource := NewResource(userModel, ResourceConfig{
+	userResource := NewTypedResource(userModel, ResourceConfig{
 		Router: tr,
 		Prefix: "/api/v1",
 	})

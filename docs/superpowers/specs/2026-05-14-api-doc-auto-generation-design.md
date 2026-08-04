@@ -2,7 +2,7 @@
 
 ## 1. 背景与目标
 
-本设计旨在为 `rest` 框架的每个 `Resource[T]` 自动生成符合 **OpenAPI 3.0** 规范的 JSON 文档，使前端开发者、测试人员及 API 消费者能够直接通过运行时 HTTP 端点获取准确的 API 契约。
+本设计旨在为 `rest` 框架的每个 `TypedResource[T]` 自动生成符合 **OpenAPI 3.0** 规范的 JSON 文档，使前端开发者、测试人员及 API 消费者能够直接通过运行时 HTTP 端点获取准确的 API 契约。
 
 ### 1.1 设计原则
 
@@ -219,7 +219,7 @@ if r.opts.enableOpenAPI {
 
 ```
 应用启动
-  → NewModel[T](WithOpenAPI(true))
+  → NewTypedModel[T](WithOpenAPI(true))
       → Resource.Register()
           → schema.GetVisibleSchemas (按 scenario 分组查询)
               → openapi.Generator.Generate()

@@ -1,8 +1,8 @@
-# Model[T] Paging API Refactor Implementation Plan
+# TypedModel[T] Paging API Refactor Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace `Model[T].Find` with `List/Paginate/Cursor/Count` methods and eliminate `Builder` side effects via `Clone`.
+**Goal:** Replace `TypedModel[T].Find` with `List/Paginate/Cursor/Count` methods and eliminate `Builder` side effects via `Clone`.
 
 **Architecture:** Keep `Builder` mutable but add `Clone()` for isolation. `Query.Count` clones internally. `Model` methods clone when they need to modify builder state. Three paging modes: `List` (offset/limit, no count), `Paginate` (page/size with auto-count), `Cursor` (base64-encoded offset, load-more style).
 
@@ -296,7 +296,7 @@ import (
 Replace the `Find` method in `rest/model.go` with `List` and `Count` (delete `Find` first, then add the new methods below `Detail`):
 
 ```go
-func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *query.Builder) ([]*T, error) {
+func (m *TypedModel[T]) List(ctx context.Context, offset, limit int, queryBuilder *query.Builder) ([]*T, error) {
 	if !m.HasScenario(schema.ScenarioSearch) {
 		return nil, ErrPermissionDenied
 	}
@@ -332,7 +332,7 @@ func (m *Model[T]) List(ctx context.Context, offset, limit int, queryBuilder *qu
 	return values, nil
 }
 
-func (m *Model[T]) Count(ctx context.Context, queryBuilder *query.Builder) (int64, error) {
+func (m *TypedModel[T]) Count(ctx context.Context, queryBuilder *query.Builder) (int64, error) {
 	if !m.HasScenario(schema.ScenarioSearch) {
 		return 0, ErrPermissionDenied
 	}
@@ -377,7 +377,7 @@ func setupPagingModel(t *testing.T) *Model[pagingUser] {
 		t.Fatalf("failed to open db: %v", err)
 	}
 	ctx := context.Background()
-	model, err := NewModel[pagingUser](ctx, WithDB(db), WithModuleName("paging_test"))
+	model, err := NewTypedModel[pagingUser](ctx, WithDB(db), WithModuleName("paging_test"))
 	if err != nil {
 		t.Fatalf("failed to create model: %v", err)
 	}
@@ -493,7 +493,7 @@ git commit -m "feat: add Model.List and Model.Count with no side effects"
 Append to `rest/model.go` (after `Count`):
 
 ```go
-func (m *Model[T]) Paginate(ctx context.Context, page, size int, queryBuilder *query.Builder) (*PageResult[T], error) {
+func (m *TypedModel[T]) Paginate(ctx context.Context, page, size int, queryBuilder *query.Builder) (*PageResult[T], error) {
 	if page < 1 {
 		page = 1
 	}
@@ -523,7 +523,7 @@ func (m *Model[T]) Paginate(ctx context.Context, page, size int, queryBuilder *q
 	}, nil
 }
 
-func (m *Model[T]) Cursor(ctx context.Context, cursor string, limit int, queryBuilder *query.Builder) (*CursorResult[T], error) {
+func (m *TypedModel[T]) Cursor(ctx context.Context, cursor string, limit int, queryBuilder *query.Builder) (*CursorResult[T], error) {
 	offset, err := decodeCursor(cursor)
 	if err != nil {
 		return nil, err
@@ -682,7 +682,7 @@ git commit -m "feat: add Model.Paginate and Model.Cursor"
 Replace the `Search` method in `rest/resource.go` with:
 
 ```go
-func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
+func (r *TypedResource[T]) Search(res http.ResponseWriter, req *http.Request) {
 	var (
 		err        error
 		pageIndex  int
@@ -745,7 +745,7 @@ git commit -m "refactor: Resource.Search uses Model.Paginate instead of Find"
 Remove the entire `Find` method (lines 210-241 approximately) from `rest/model.go`. The method signature is:
 
 ```go
-func (m *Model[T]) Find(ctx context.Context, offset, limit int, queryBuilder *query.Builder) (totalCount int64, values []*T, err error) {
+func (m *TypedModel[T]) Find(ctx context.Context, offset, limit int, queryBuilder *query.Builder) (totalCount int64, values []*T, err error) {
 ```
 
 Delete from `if !m.HasScenario(schema.ScenarioSearch)` through the closing `}`.

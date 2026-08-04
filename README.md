@@ -6,7 +6,8 @@
 
 ## 特性
 
-- **泛型 Model[T]** — 通过泛型为任意结构体一键生成标准 CRUD 接口（Create / Update / Delete / Detail / Search）
+- **泛型 TypedModel[T]** — 通过泛型为任意结构体一键生成类型安全的 CRUD 接口（Create / Update / Delete / Detail / Search）
+- **动态 Model** — 模型类型在运行时才确定时使用（批量实例化、动态发现、混合类型集合），CRUD 结果通过类型断言取回
 - **动态 Schema 管理** — 基于结构体标签自动生成字段配置，支持场景化字段控制（创建、更新、列表、详情、搜索、导出等）
 - **类型安全查询构建器** — 支持 WHERE、JOIN、GROUP BY、HAVING、ORDER BY、分页、子查询（IN / EXISTS）、聚合函数（COUNT / SUM / AVG / MAX / MIN）
 - **数据格式化器** — 内置多种字段格式（日期、时间、百分比、时长、下拉选项等），支持自定义扩展
@@ -56,7 +57,7 @@ func main() {
     ctx := context.Background()
 
     // 创建泛型模型
-    model, err := rest.NewModel[User](ctx,
+    model, err := rest.NewTypedModel[User](
         rest.WithDB(db),
         rest.WithModuleName("user"),
     )
@@ -66,15 +67,15 @@ func main() {
 
     // 创建记录
     user := User{Name: "Alice", Email: "alice@example.com", Age: 30}
-    diff, err := model.Create(ctx, user)
+    diff, err := model.Create(ctx, &user)
     fmt.Println("Created:", diff)
 
-    // 搜索记录
+    // 分页搜索记录
     q := query.NewBuilder().
         Where("age", query.OpGte, 18).
         OrderBy("created_at", "DESC")
 
-    total, users, err := model.Search(ctx, 0, 10, q)
+    total, users, err := model.Paginate(ctx, 0, 10, q)
     fmt.Printf("Total: %d, Users: %+v\n", total, users)
 }
 ```
@@ -86,7 +87,10 @@ func main() {
 ```
 .
 ├── rest.go                  # 包入口
-├── model.go                 # 泛型 Model[T] 定义与 CRUD 操作
+├── model.go                 # 动态 Model 定义与 CRUD 操作（非泛型核心）
+├── model_typed.go           # 泛型 TypedModel[T] 类型安全包装
+├── resource.go              # 动态 Resource 定义与 HTTP 处理
+├── resource_typed.go        # 泛型 TypedResource[T] 类型安全包装
 ├── hook.go                  # 生命周期钩子注册系统
 ├── options.go               # 模型配置选项
 ├── scope.go                 # 运行时作用域（Context 传递）
@@ -114,14 +118,14 @@ func main() {
 
 ---
 
-## Model[T] CRUD 操作
+## TypedModel[T] CRUD 操作
 
 ```go
 // 创建
-model.Create(ctx, user)
+model.Create(ctx, &user)
 
 // 更新（返回变更字段 diff）
-model.Update(ctx, primaryKey, user)
+model.Update(ctx, primaryKey, &user)
 
 // 删除
 model.Delete(ctx, primaryKey)
@@ -129,8 +133,46 @@ model.Delete(ctx, primaryKey)
 // 详情
 model.Detail(ctx, primaryKey)
 
-// 搜索（支持分页）
-model.Search(ctx, offset, limit, queryBuilder)
+// 分页搜索
+total, list, err := model.Paginate(ctx, page, size, queryBuilder)
+
+// 游标分页
+next, hasMore, list, err := model.Cursor(ctx, cursor, limit, queryBuilder)
+```
+
+### 动态 Model（运行时确定类型）
+
+当模型类型在编译期无法确定（批量实例化、从配置/插件动态发现、混合类型集合）时，使用动态 Model：
+
+```go
+// 实例（值或指针）或 reflect.Type 均可作为模型
+userModel, _ := rest.NewModel(&User{}, rest.WithDB(db), rest.WithModuleName("user"))
+orderModel, _ := rest.NewModel(reflect.TypeOf(Order{}), rest.WithDB(db), rest.WithModuleName("order"))
+
+// 批量实例化：循环注册任意多个模型
+models := []any{&User{}, &Order{}, &Product{}}
+for _, m := range models {
+    model, err := rest.NewModel(m, rest.WithDB(db), rest.WithModuleName("shop"))
+    if err != nil {
+        panic(err)
+    }
+    rest.NewResource(model, rest.ResourceConfig{Router: router, Prefix: "/api/v1"}).Register()
+}
+
+// CRUD 结果通过类型断言取回
+v, _ := userModel.Detail(ctx, 1)
+user := v.(*User)
+
+list, _ := userModel.List(ctx, 0, 10, nil)
+users := list.([]*User)
+
+// 动态模型的钩子使用 any 签名
+userModel.RegisterBeforeCreate(func(ctx context.Context, db *gorm.DB, model any) error {
+    if u, ok := model.(*User); ok && u.Email == "" {
+        return errors.New("email required")
+    }
+    return nil
+})
 ```
 
 ### 配置选项
@@ -146,12 +188,12 @@ model.Search(ctx, offset, limit, queryBuilder)
 
 ## HTTP Resource
 
-将 `Model[T]` 包装为 HTTP Resource，自动生成 RESTful 路由：
+将 `TypedModel[T]` 包装为 HTTP Resource，自动生成 RESTful 路由：
 
 ```go
-model, _ := rest.NewModel[User](rest.WithDB(db), rest.WithModuleName("user"))
+model, _ := rest.NewTypedModel[User](rest.WithDB(db), rest.WithModuleName("user"))
 
-userResource := rest.NewResource(model, rest.ResourceConfig{
+userResource := rest.NewTypedResource(model, rest.ResourceConfig{
     Router:    router,         // 路由引擎
     Prefix:    "/api/v1",      // URL 前缀
     Formatter: formatter,      // 可选：数据格式化器
@@ -159,10 +201,10 @@ userResource := rest.NewResource(model, rest.ResourceConfig{
 userResource.Register() // 自动注册 Create / Update / Delete / Detail / Search / Export / OpenAPI 路由
 ```
 
-如果想合并「构造 Model」与「包装为 Resource」两步，可使用便捷函数 `NewResourceWithOptions`，错误会一并返回：
+如果想合并「构造 Model」与「包装为 Resource」两步，可使用便捷函数 `NewTypedResourceWithOptions`，错误会一并返回：
 
 ```go
-userResource, err := rest.NewResourceWithOptions[User](rest.ResourceConfig{
+userResource, err := rest.NewTypedResourceWithOptions[User](rest.ResourceConfig{
     Router:    router,
     Prefix:    "/api/v1",
     Formatter: formatter,
@@ -176,6 +218,16 @@ if err != nil {
 userResource.Register()
 ```
 
+动态 Resource 同样可用，`NewResource` / `NewResourceWithOptions` 以模型实例（或 `reflect.Type`）为首参：
+
+```go
+res := rest.NewResource(model, rest.ResourceConfig{Router: router, Prefix: "/api/v1"})
+res.Register()
+
+res, err := rest.NewResourceWithOptions(&User{}, rest.ResourceConfig{Router: router, Prefix: "/api/v1"},
+    rest.WithDB(db), rest.WithModuleName("user"))
+```
+
 `ResourceConfig` 字段：
 
 | 字段 | 说明 |
@@ -186,6 +238,12 @@ userResource.Register()
 | `Formatter` | 数据格式化器 |
 | `TenantResolve` | 多租户解析函数 |
 | `UserResolve` | 用户解析函数 |
+
+### 路由注册守卫
+
+- 当 `Formatter == nil` 时，**Export 路由不会被注册**（避免运行期出现 500 兜底）。
+- `Register()` 是幂等的（基于 `atomic.Bool`），多次调用安全。
+- 主键解析（`findPrimaryKey`）按 URL 段位匹配 `:id`，对多余前缀段、尾斜杠等都有回退。
 
 ---
 
@@ -228,7 +286,7 @@ rest.RegisterBeforeDelete(func(ctx context.Context, db *gorm.DB, model any) erro
 ### 局部注册（泛型，类型安全）
 
 ```go
-model, _ := rest.NewModel[User](rest.WithDB(db))
+model, _ := rest.NewTypedModel[User](rest.WithDB(db))
 
 // 只有这个 model 实例会触发
 model.RegisterAfterCreate(func(ctx context.Context, db *gorm.DB, u *User, diff []*rest.DiffAttr) {
@@ -433,7 +491,7 @@ if scope != nil {
 启用多租户后，模型自动在 Schema 和查询中注入 `tenant_id` 隔离条件：
 
 ```go
-model, _ := rest.NewModel[User](ctx,
+model, _ := rest.NewTypedModel[User](
     rest.WithDB(db),
     rest.WithModuleName("user"),
     rest.WithTenant(),  // 启用多租户
@@ -445,14 +503,39 @@ model, _ := rest.NewModel[User](ctx,
 ## 错误定义
 
 ```go
-rest.ErrPermissionDenied   // 无场景权限
-rest.ErrRecordNotFound     // 记录不存在
-rest.ErrPayloadInvalid     // 参数无效
-rest.ErrCreateFailed       // 创建失败
-rest.ErrUpdateFailed       // 更新失败
-rest.ErrDeleteFailed       // 删除失败
-rest.ErrInternal           // 内部错误
+rest.ErrPermissionDenied   // 4003 — 无场景权限
+rest.ErrRecordNotFound     // 4004 — 记录不存在
+rest.ErrPayloadInvalid     // 1001 — 参数无效
+rest.ErrCreateFailed       // 6001 — 创建失败
+rest.ErrUpdateFailed       // 6002 — 更新失败
+rest.ErrDeleteFailed       // 6003 — 删除失败
+rest.ErrUnavailable        // 1003 — 内部错误
 ```
+
+### 错误响应契约
+
+所有 handler（`Create` / `Update` / `Delete` / `Detail` / `Search` / `Export`）的失败响应统一为 `application/json`：
+
+| 触发条件              | HTTP 状态 | `Error.Code` | 含义 |
+|-----------------------|-----------|--------------|------|
+| `ErrPermissionDenied` | 403       | 4003         | 场景未启用 |
+| `ErrRecordNotFound`   | 404       | 4004         | 记录不存在；`Detail` 也会把 `gorm.ErrRecordNotFound` 归一到这个 |
+| `ErrPayloadInvalid`   | 400       | 1001         | 请求体无法解析 |
+| `ErrCreateFailed`     | 500       | 6001         | 创建失败 |
+| `ErrUpdateFailed`     | 500       | 6002         | 更新失败 |
+| `ErrDeleteFailed`     | 500       | 6003         | 删除失败 |
+| `ErrUnavailable`      | 500       | 1003         | 其它内部错误 |
+| 其它 `error`          | 500       | 0            | 非框架错误；body 仅含 `reason` |
+
+错误响应体：
+
+```json
+{ "code": 4004, "reason": "record not found" }
+```
+
+`OpenApi` 端点无论成功失败均返回 `Content-Type: application/json`，失败时响应体格式同上。
+
+> 若配置了自定义 `Responder`，错误码映射由 Responder 自行负责，默认 `Respond` 行为不再生效。
 
 ---
 

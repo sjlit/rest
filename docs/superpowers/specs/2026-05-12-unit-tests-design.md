@@ -19,7 +19,7 @@
 
 ### 不包含（本次迭代）
 
-- `rest` 包的 `Model[T]` CRUD 方法（深度依赖 `*gorm.DB` 链式调用）
+- `rest` 包的 `TypedModel[T]` CRUD 方法（深度依赖 `*gorm.DB` 链式调用）
 - `schema` 包的 `GetSchemas`、`GetVisibleSchemas`、`AutoMigrate`（需要真实数据库连接）
 - `plugins` 包（当前为空）
 

@@ -1,8 +1,8 @@
-# Model[T] 分页 API 重构设计
+# TypedModel[T] 分页 API 重构设计
 
 ## 背景
 
-当前 `Model[T].Find` 方法存在两个根本问题：
+当前 `TypedModel[T].Find` 方法存在两个根本问题：
 
 1. **强制 Count + All 双重查询**：即使调用方不需要总数，也会执行一次 `COUNT(*)`，大数据量下性能差
 2. **副作用污染 Builder**：`Find` 内部直接修改 `queryBuilder` 的 `Offset/Limit`，对调用方不可见但危险
@@ -54,27 +54,27 @@ type CursorResult[T any] struct {
 }
 ```
 
-### Model[T] 新方法
+### TypedModel[T] 新方法
 
 ```go
 // List — 纯数据查询，不执行 Count
-func (m *Model[T]) List(ctx context.Context, offset, limit int, qb *query.Builder) ([]*T, error)
+func (m *TypedModel[T]) List(ctx context.Context, offset, limit int, qb *query.Builder) ([]*T, error)
 
 // Paginate — 精确分页，内部自动 Count
-func (m *Model[T]) Paginate(ctx context.Context, page, size int, qb *query.Builder) (*PageResult[T], error)
+func (m *TypedModel[T]) Paginate(ctx context.Context, page, size int, qb *query.Builder) (*PageResult[T], error)
 
 // Cursor — 游标分页，高性能，无总数
-func (m *Model[T]) Cursor(ctx context.Context, cursor string, limit int, qb *query.Builder) (*CursorResult[T], error)
+func (m *TypedModel[T]) Cursor(ctx context.Context, cursor string, limit int, qb *query.Builder) (*CursorResult[T], error)
 
 // Count — 独立计数
-func (m *Model[T]) Count(ctx context.Context, qb *query.Builder) (int64, error)
+func (m *TypedModel[T]) Count(ctx context.Context, qb *query.Builder) (int64, error)
 ```
 
 ### 删除的旧方法
 
 ```go
 // 删除 Find
-func (m *Model[T]) Find(ctx context.Context, offset, limit int, queryBuilder *query.Builder) (totalCount int64, values []*T, err error)
+func (m *TypedModel[T]) Find(ctx context.Context, offset, limit int, queryBuilder *query.Builder) (totalCount int64, values []*T, err error)
 ```
 
 ---
@@ -184,7 +184,7 @@ func (q *Query) Count(ctx context.Context) (int64, error) {
 `resource.go` 的 `Search` 方法改为调用 `Paginate`：
 
 ```go
-func (r *Resource[T]) Search(res http.ResponseWriter, req *http.Request) {
+func (r *TypedResource[T]) Search(res http.ResponseWriter, req *http.Request) {
     // ... 前置逻辑不变 ...
 
     queryBuilder := r.buildQuery(req, schemas)
