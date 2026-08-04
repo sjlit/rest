@@ -26,14 +26,14 @@ export class Scenarios extends Array<Scenario> {
       const valid = items.filter(isValidScenario)
       if (valid.length !== items.length) {
         const dropped = items.filter(v => !isValidScenario(v))
-        console.warn(`[schema-ui] Scenarios.from dropped unknown values: ${dropped.join(', ')}`)
+        console.warn(`[rest-ui] Scenarios.from dropped unknown values: ${dropped.join(', ')}`)
       }
       return new Scenarios(valid)
     }
     const valid = raw.filter(isValidScenario)
     if (valid.length !== raw.length) {
       const dropped = raw.filter(v => !isValidScenario(v))
-      console.warn(`[schema-ui] Scenarios.from dropped unknown values: ${dropped.join(', ')}`)
+      console.warn(`[rest-ui] Scenarios.from dropped unknown values: ${dropped.join(', ')}`)
     }
     return new Scenarios(valid)
   }

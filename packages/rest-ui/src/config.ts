@@ -13,4 +13,4 @@ export interface SchemaUIConfig {
   transformRequest?: (config: any) => any
 }
 
-export const GLOBAL_CONFIG_KEY = Symbol('schema-ui-config')
+export const GLOBAL_CONFIG_KEY = Symbol('rest-ui-config')

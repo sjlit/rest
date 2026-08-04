@@ -16,8 +16,8 @@ export default defineConfig({
       entry: resolve(__dirname, 'src/index.ts'),
       name: 'SchemaUI',
       fileName: (format) => {
-        if (format === 'es') return 'schema-ui.es.js'
-        return 'schema-ui.cjs'
+        if (format === 'es') return 'rest-ui.es.js'
+        return 'rest-ui.cjs'
       },
       formats: ['es', 'cjs'],
     },

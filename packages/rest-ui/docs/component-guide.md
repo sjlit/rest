@@ -23,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { SchemaViewer } from '@ace/schema-ui'
+import { SchemaViewer } from '@nobla/rest-ui'
 </script>
 ```
 
@@ -177,8 +177,8 @@ CRUD 实例初始化完成后触发：
 </template>
 
 <script setup lang="ts">
-import { SchemaViewer } from '@ace/schema-ui'
-import type { CRUD } from '@ace/schema-ui'
+import { SchemaViewer } from '@nobla/rest-ui'
+import type { CRUD } from '@nobla/rest-ui'
 
 function onReady(crud: CRUD) {
   console.log('主键字段：', crud.primaryKey)
@@ -236,8 +236,8 @@ function onReady(crud: CRUD) {
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { SchemaPage } from '@ace/schema-ui'
-import type { Schema, Model, Pagination } from '@ace/schema-ui'
+import { SchemaPage } from '@nobla/rest-ui'
+import type { Schema, Model, Pagination } from '@nobla/rest-ui'
 
 const schemas = ref<Schema[]>([])
 const models = ref<Model[]>([])
@@ -334,8 +334,8 @@ pageRef.value?.closeForm()
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
-import { SchemaPage, CRUD, useSchemaUI } from '@ace/schema-ui'
-import type { Schema, Model, Pagination } from '@ace/schema-ui'
+import { SchemaPage, CRUD, useSchemaUI } from '@nobla/rest-ui'
+import type { Schema, Model, Pagination } from '@nobla/rest-ui'
 
 const config = useSchemaUI()
 
@@ -391,8 +391,8 @@ init()
 </template>
 
 <script setup lang="ts">
-import { SchemaGrid } from '@ace/schema-ui'
-import type { Schema, Model, Action } from '@ace/schema-ui'
+import { SchemaGrid } from '@nobla/rest-ui'
+import type { Schema, Model, Action } from '@nobla/rest-ui'
 
 const schemas: Schema[] = [/* ... */]
 const models: Model[] = [/* ... */]
@@ -462,8 +462,8 @@ function handleSort({ column, order }: { column: string; order: string | null })
 </template>
 
 <script setup lang="ts">
-import { SchemaForm } from '@ace/schema-ui'
-import type { Schema, Model } from '@ace/schema-ui'
+import { SchemaForm } from '@nobla/rest-ui'
+import type { Schema, Model } from '@nobla/rest-ui'
 
 const schemas: Schema[] = [/* ... */]
 const initialModel: Model = { status: 'active' }
@@ -512,7 +512,7 @@ function handleSubmit(model: Model, displaySchemas: Schema[]) {
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { SchemaForm } from '@ace/schema-ui'
+import { SchemaForm } from '@nobla/rest-ui'
 
 const formRef = ref<InstanceType<typeof SchemaForm> | null>(null)
 
@@ -661,7 +661,7 @@ Action 是本库统一的按钮定义接口，用于搜索操作、行操作、�
 ### 基础 Action
 
 ```typescript
-import type { Action } from '@ace/schema-ui'
+import type { Action } from '@nobla/rest-ui'
 
 const action: Action = {
   name: 'edit',        // 唯一标识

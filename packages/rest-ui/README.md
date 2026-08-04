@@ -1,4 +1,4 @@
-# @ace/schema-ui
+# @nobla/rest-ui
 
 基于 REST Schema 定义的 Vue 3 + Element Plus 组件库，提供 schema 驱动的自动 CRUD 页面渲染能力。
 
@@ -32,7 +32,7 @@ ui/        -- UI 组件层（Element Plus 组件封装）
 ## 安装
 
 ```bash
-npm install @ace/schema-ui
+npm install @nobla/rest-ui
 ```
 
 ### Peer Dependencies
@@ -50,7 +50,7 @@ npm install vue@^3.3.0 element-plus@^2.12.0 @element-plus/icons-vue@^2.3.0
 ```typescript
 import { createApp } from 'vue'
 import ElementPlus from 'element-plus'
-import { SchemaUIPlugin } from '@ace/schema-ui'
+import { SchemaUIPlugin } from '@nobla/rest-ui'
 import axios from 'axios'
 import App from './App.vue'
 
@@ -100,7 +100,7 @@ app.mount('#app')
 </template>
 
 <script setup lang="ts">
-import { SchemaViewer } from '@ace/schema-ui'
+import { SchemaViewer } from '@nobla/rest-ui'
 </script>
 ```
 
@@ -121,8 +121,8 @@ import { SchemaViewer } from '@ace/schema-ui'
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { SchemaPage } from '@ace/schema-ui'
-import type { Schema, Model, Pagination } from '@ace/schema-ui'
+import { SchemaPage } from '@nobla/rest-ui'
+import type { Schema, Model, Pagination } from '@nobla/rest-ui'
 
 const schemas = ref<Schema[]>([])
 const models = ref<Model[]>([])
@@ -183,7 +183,7 @@ loadSchemas()
 在组件或 composable 中获取全局配置：
 
 ```typescript
-import { useSchemaUI } from '@ace/schema-ui'
+import { useSchemaUI } from '@nobla/rest-ui'
 
 const config = useSchemaUI()
 // config.httpClient, config.i18n, config.hasPermission, ...
@@ -386,7 +386,7 @@ LiveTypeCascader   = 'cascader'
 场景数组的扩展类，提供便捷的 `has()` 方法。
 
 ```typescript
-import { Scenarios } from '@ace/schema-ui'
+import { Scenarios } from '@nobla/rest-ui'
 
 const scenarios = Scenarios.from('create;update;list')
 scenarios.has('create')  // true
@@ -398,7 +398,7 @@ scenarios.has('delete')  // false
 模型值的编码/解码函数，用于表单提交前后的数据转换。
 
 ```typescript
-import { encode, decode } from '@ace/schema-ui'
+import { encode, decode } from '@nobla/rest-ui'
 
 // encode: Date -> 格式字符串（YYYY-MM-DD HH:mm:ss）
 const submitModel = encode(model, schemas, 'create')
@@ -414,7 +414,7 @@ const formModel = decode(rawModel, schemas, 'create')
 ### getModelValue / getModelLabel
 
 ```typescript
-import { getModelValue, getModelLabel } from '@ace/schema-ui'
+import { getModelValue, getModelLabel } from '@nobla/rest-ui'
 
 const value = getModelValue(model, 'status')      // 获取原始值
 const label = getModelLabel(model, 'status')      // 获取显示标签（支持枚举映射）
@@ -425,7 +425,7 @@ const label = getModelLabel(model, 'status')      // 获取显示标签（支持
 根据 schema 生成 Element Plus 表单验证规则。
 
 ```typescript
-import { generateSchemaRule } from '@ace/schema-ui'
+import { generateSchemaRule } from '@nobla/rest-ui'
 
 const rules = generateSchemaRule(
   (key, args) => `${args[0]}不能为空`,  // 翻译函数
@@ -440,7 +440,7 @@ const rules = generateSchemaRule(
 检查字段在指定模型下是否可见（根据 `visible` 条件）。
 
 ```typescript
-import { checkSchemaVisible } from '@ace/schema-ui'
+import { checkSchemaVisible } from '@nobla/rest-ui'
 
 const isVisible = checkSchemaVisible(schema, model)
 ```
@@ -450,7 +450,7 @@ const isVisible = checkSchemaVisible(schema, model)
 清除搜索模型中的空值（`''`、`null`、`undefined`）。
 
 ```typescript
-import { clearSearchModel } from '@ace/schema-ui'
+import { clearSearchModel } from '@nobla/rest-ui'
 
 const cleanQuery = clearSearchModel(searchModel, schemas)
 ```
@@ -529,8 +529,8 @@ const cleanQuery = clearSearchModel(searchModel, schemas)
 </template>
 
 <script setup lang="ts">
-import { SchemaViewer } from '@ace/schema-ui'
-import type { CRUD, Action } from '@ace/schema-ui'
+import { SchemaViewer } from '@nobla/rest-ui'
+import type { CRUD, Action } from '@nobla/rest-ui'
 
 const customRowActions: Action[] = [
   {
@@ -817,8 +817,8 @@ Schema 加载 URI：
 
 ```vue
 <script setup lang="ts">
-import { SchemaViewer } from '@ace/schema-ui'
-import type { Action } from '@ace/schema-ui'
+import { SchemaViewer } from '@nobla/rest-ui'
+import type { Action } from '@nobla/rest-ui'
 
 const batchActions: Action[] = [
   {
@@ -887,8 +887,8 @@ const rowActions: Action[] = [
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { SchemaPage, CRUD } from '@ace/schema-ui'
-import type { Schema, Model, Pagination, Action } from '@ace/schema-ui'
+import { SchemaPage, CRUD } from '@nobla/rest-ui'
+import type { Schema, Model, Pagination, Action } from '@nobla/rest-ui'
 
 const schemas = ref<Schema[]>([])
 const models = ref<Model[]>([])
@@ -943,9 +943,9 @@ const rowActions: Action[] = [
 
 ```vue
 <script setup lang="ts">
-import { SchemaViewer } from '@ace/schema-ui'
+import { SchemaViewer } from '@nobla/rest-ui'
 import { onMounted, ref } from 'vue'
-import type { CRUD } from '@ace/schema-ui'
+import type { CRUD } from '@nobla/rest-ui'
 
 const viewerRef = ref<InstanceType<typeof SchemaViewer> | null>(null)
 
@@ -975,7 +975,7 @@ function onReady(crud: CRUD) {
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { SchemaViewer } from '@ace/schema-ui'
+import { SchemaViewer } from '@nobla/rest-ui'
 
 const currentModule = ref('user')
 const currentTable = ref('admin')
@@ -1077,9 +1077,10 @@ GET /{apiPrefix}/{module}/{pluralTable}?page=1&pagesize=15&sort=-created_at&__fo
 ### 本地开发
 
 ```bash
-cd packages/schema-ui
+cd packages/rest-ui
 npm install
 npm run dev    # 监听模式构建
+npm test       # 运行单元测试（node:test，无额外依赖）
 ```
 
 ### 在独立 Vue 项目中本地引用
@@ -1088,7 +1089,7 @@ npm run dev    # 监听模式构建
 
 #### 方式一：Vite Alias 指向源码（推荐，支持热更新）
 
-在消费项目的 `vite.config.ts` 中配置路径别名，直接指向 `@ace/schema-ui` 的源码入口：
+在消费项目的 `vite.config.ts` 中配置路径别名，直接指向 `@nobla/rest-ui` 的源码入口：
 
 ```typescript
 import { defineConfig } from 'vite'
@@ -1097,7 +1098,7 @@ import { resolve } from 'path'
 export default defineConfig({
   resolve: {
     alias: {
-      '@ace/schema-ui': resolve(__dirname, '/absolute/path/to/rest/packages/schema-ui/src/index.ts'),
+      '@nobla/rest-ui': resolve(__dirname, '/absolute/path/to/rest/packages/rest-ui/src/index.ts'),
     },
   },
 })
@@ -1109,7 +1110,7 @@ export default defineConfig({
    npm install vue@^3.3.0 element-plus@^2.12.0 @element-plus/icons-vue@^2.3.0
    ```
 2. 在 `vite.config.ts` 添加上述 `alias` 配置（路径替换为你本地的实际绝对路径）。
-3. 启动消费项目，修改 `schema-ui` 源码即可实时热更新。
+3. 启动消费项目，修改 `rest-ui` 源码即可实时热更新。
 
 > **注意**：此方式要求消费项目具备编译 `.vue` 单文件组件的能力（已安装 `@vitejs/plugin-vue`）。
 
@@ -1119,22 +1120,22 @@ export default defineConfig({
 
 ```bash
 # 在消费项目中执行
-npm install /absolute/path/to/rest/packages/schema-ui
+npm install /absolute/path/to/rest/packages/rest-ui
 ```
 
 `package.json` 会自动添加：
 ```json
 "dependencies": {
-  "@ace/schema-ui": "file:/absolute/path/to/rest/packages/schema-ui"
+  "@nobla/rest-ui": "file:/absolute/path/to/rest/packages/rest-ui"
 }
 ```
 
 **步骤**：
 1. 在消费项目中执行上述 `npm install` 命令。
 2. 确保消费项目已安装 `peerDependencies`（`vue`、`element-plus`、`@element-plus/icons-vue`）。
-3. 在 `schema-ui` 目录启动监听构建：
+3. 在 `rest-ui` 目录启动监听构建：
    ```bash
-   cd packages/schema-ui
+   cd packages/rest-ui
    npm run dev   # vite build --watch，自动更新 dist/
    ```
 4. 消费项目刷新页面即可获得最新构建产物。
@@ -1148,8 +1149,8 @@ npm run build  # 输出到 dist/ 目录
 ```
 
 输出文件：
-- `dist/schema-ui.es.js` — ESM 格式
-- `dist/schema-ui.cjs` — CJS 格式
+- `dist/rest-ui.es.js` — ESM 格式
+- `dist/rest-ui.cjs` — CJS 格式
 - `dist/style.css` — 组件样式（自动随 JS 注入，也可单独引用）
 - `dist/index.d.ts` — TypeScript 类型声明
 
@@ -1181,7 +1182,7 @@ import type {
   Sortable,
   CRUDOptions,
   SchemaUIConfig,
-} from '@ace/schema-ui'
+} from '@nobla/rest-ui'
 ```
 
 ---

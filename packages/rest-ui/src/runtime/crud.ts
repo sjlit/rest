@@ -210,7 +210,12 @@ export class CRUD {
 
   findModelPrimaryKey(model: Model): any {
     if (model && typeof model === 'object') {
-      return model[this.primaryKey]
+      const value = model[this.primaryKey]
+      // 兼容后端 __format=both 返回的 { label, value } 单元格结构，解包取原始值
+      if (value && typeof value === 'object' && 'value' in value) {
+        return value.value
+      }
+      return value
     }
     return model
   }

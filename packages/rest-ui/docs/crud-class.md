@@ -32,7 +32,7 @@
 ## 构造函数
 
 ```typescript
-import { CRUD } from '@ace/schema-ui'
+import { CRUD } from '@nobla/rest-ui'
 
 const crud = new CRUD({
   module: 'user',           // 模块名
@@ -451,7 +451,7 @@ new CRUD(options)
 ### 基础 CRUD 操作
 
 ```typescript
-import { CRUD } from '@ace/schema-ui'
+import { CRUD } from '@nobla/rest-ui'
 
 const crud = new CRUD({
   module: 'user',
@@ -574,8 +574,8 @@ await crud.searchModel()
 ### 自定义业务方法
 
 ```typescript
-import { CRUD } from '@ace/schema-ui'
-import type { Model } from '@ace/schema-ui'
+import { CRUD } from '@nobla/rest-ui'
+import type { Model } from '@nobla/rest-ui'
 
 class OrderCRUD extends CRUD {
   // 审批订单

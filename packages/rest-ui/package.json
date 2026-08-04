@@ -1,24 +1,29 @@
 {
-  "name": "@ace/schema-ui",
+  "name": "@nobla/rest-ui",
   "version": "1.0.0",
   "description": "Schema-driven UI components for REST projects",
+  "license": "MIT",
   "type": "module",
-  "main": "./dist/schema-ui.cjs",
-  "module": "./dist/schema-ui.es.js",
+  "main": "./dist/rest-ui.cjs",
+  "module": "./dist/rest-ui.es.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/schema-ui.es.js",
-      "require": "./dist/schema-ui.cjs"
+      "import": "./dist/rest-ui.es.js",
+      "require": "./dist/rest-ui.cjs"
     }
   },
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",
+    "test": "node --test \"src/**/*.test.ts\"",
     "typecheck": "vue-tsc --noEmit"
   },
   "peerDependencies": {
