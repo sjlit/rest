@@ -1154,6 +1154,14 @@ npm run build  # 输出到 dist/ 目录
 - `dist/style.css` — 组件样式（自动随 JS 注入，也可单独引用）
 - `dist/index.d.ts` — TypeScript 类型声明
 
+单独引用样式（可选；组件样式默认已随 JS 自动注入）：
+
+```typescript
+import '@nobla/rest-ui/style.css'
+// 或
+import '@nobla/rest-ui/dist/style.css'
+```
+
 ### 类型检查
 
 ```bash

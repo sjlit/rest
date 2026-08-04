@@ -1,6 +1,6 @@
 {
   "name": "@nobla/rest-ui",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Schema-driven UI components for REST projects",
   "license": "MIT",
   "type": "module",
@@ -12,7 +12,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/rest-ui.es.js",
       "require": "./dist/rest-ui.cjs"
-    }
+    },
+    "./style.css": "./dist/style.css",
+    "./dist/style.css": "./dist/style.css"
   },
   "files": [
     "dist"
