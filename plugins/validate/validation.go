@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"git.nobla.cn/golang/rest/v3"
-	"git.nobla.cn/golang/rest/v3/schema"
 	validator "github.com/go-playground/validator/v10"
+	"github.com/sjlit/rest/v3"
+	"github.com/sjlit/rest/v3/schema"
 	"gorm.io/gorm"
 	gschema "gorm.io/gorm/schema"
 )

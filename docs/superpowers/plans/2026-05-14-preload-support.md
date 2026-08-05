@@ -342,7 +342,7 @@ import (
 	"context"
 	"testing"
 
-	"git.nobla.cn/golang/rest/v3/schema"
+	"github.com/sjlit/rest/v3/schema"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -521,7 +521,7 @@ import (
 	"reflect"
 	"testing"
 
-	"git.nobla.cn/golang/rest/v3/schema"
+	"github.com/sjlit/rest/v3/schema"
 	"gorm.io/gorm"
 )
 
@@ -755,7 +755,7 @@ import (
 	"context"
 	"testing"
 
-	"git.nobla.cn/golang/rest/v3/schema"
+	"github.com/sjlit/rest/v3/schema"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )

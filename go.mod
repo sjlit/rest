@@ -1,4 +1,4 @@
-module git.nobla.cn/golang/rest/v3
+module github.com/sjlit/rest/v3
 
 go 1.25.0
 

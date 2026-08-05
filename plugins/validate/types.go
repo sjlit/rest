@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"git.nobla.cn/golang/rest/v3/schema"
+	"github.com/sjlit/rest/v3/schema"
 	"gorm.io/gorm"
 )
 

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"git.nobla.cn/golang/rest/v3/openapi"
-	"git.nobla.cn/golang/rest/v3/schema"
+	"github.com/sjlit/rest/v3/openapi"
+	"github.com/sjlit/rest/v3/schema"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )

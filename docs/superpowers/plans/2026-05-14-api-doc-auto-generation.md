@@ -127,7 +127,7 @@ import (
     "fmt"
     "strings"
 
-    "git.nobla.cn/golang/rest/v3/schema"
+    "github.com/sjlit/rest/v3/schema"
     "gorm.io/gorm"
 )
 
@@ -245,7 +245,7 @@ package openapi
 import (
     "testing"
 
-    "git.nobla.cn/golang/rest/v3/schema"
+    "github.com/sjlit/rest/v3/schema"
 )
 
 func TestMapSchemaType(t *testing.T) {
@@ -677,7 +677,7 @@ import (
     "encoding/json"
     "testing"
 
-    "git.nobla.cn/golang/rest/v3/schema"
+    "github.com/sjlit/rest/v3/schema"
     "gorm.io/driver/sqlite"
     "gorm.io/gorm"
 )
@@ -921,7 +921,7 @@ import (
     // existing imports...
     "context"
     "encoding/json"
-    "git.nobla.cn/golang/rest/v3/openapi"
+    "github.com/sjlit/rest/v3/openapi"
     "net/http"
 )
 ```
@@ -1031,7 +1031,7 @@ import (
     "encoding/json"
     "net/http"
     "net/http/httptest"
-    "git.nobla.cn/golang/rest/v3/openapi"
+    "github.com/sjlit/rest/v3/openapi"
 )
 ```
 

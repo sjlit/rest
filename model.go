@@ -8,10 +8,10 @@ import (
 	"slices"
 	"strconv"
 
-	"git.nobla.cn/golang/rest/v3/internal/inflector"
-	"git.nobla.cn/golang/rest/v3/internal/safelog"
-	"git.nobla.cn/golang/rest/v3/query"
-	"git.nobla.cn/golang/rest/v3/schema"
+	"github.com/sjlit/rest/v3/internal/inflector"
+	"github.com/sjlit/rest/v3/internal/safelog"
+	"github.com/sjlit/rest/v3/query"
+	"github.com/sjlit/rest/v3/schema"
 	"gorm.io/gorm"
 	gormSchema "gorm.io/gorm/schema"
 )

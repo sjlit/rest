@@ -14,10 +14,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"git.nobla.cn/golang/rest/v3/formats"
-	"git.nobla.cn/golang/rest/v3/openapi"
-	"git.nobla.cn/golang/rest/v3/query"
-	"git.nobla.cn/golang/rest/v3/schema"
+	"github.com/sjlit/rest/v3/formats"
+	"github.com/sjlit/rest/v3/openapi"
+	"github.com/sjlit/rest/v3/query"
+	"github.com/sjlit/rest/v3/schema"
 	"gorm.io/gorm"
 )
 
