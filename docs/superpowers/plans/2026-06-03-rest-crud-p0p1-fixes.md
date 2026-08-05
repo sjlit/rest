@@ -196,7 +196,7 @@ import (
 	"reflect"
 	"strings"
 
-	"git.nobla.cn/golang/rest/schema"
+	"git.nobla.cn/golang/rest/v3/schema"
 	"gorm.io/gorm"
 	gormSchema "gorm.io/gorm/schema"
 )
@@ -758,7 +758,7 @@ go test ./internal/safelog/... -v 2>&1 | tail -10
 	}
 ```
 
-并在 `model.go` 顶部 import 块添加 `"git.nobla.cn/golang/rest/internal/safelog"`。
+并在 `model.go` 顶部 import 块添加 `"git.nobla.cn/golang/rest/v3/internal/safelog"`。
 
 - [ ] **Step 5: 跑全部测试**
 

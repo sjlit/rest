@@ -283,9 +283,9 @@ import (
 	"slices"
 	"strconv"
 
-	"git.nobla.cn/golang/rest/internal/inflector"
-	"git.nobla.cn/golang/rest/query"
-	"git.nobla.cn/golang/rest/schema"
+	"git.nobla.cn/golang/rest/v3/internal/inflector"
+	"git.nobla.cn/golang/rest/v3/query"
+	"git.nobla.cn/golang/rest/v3/schema"
 	"gorm.io/gorm"
 	gormSchema "gorm.io/gorm/schema"
 )
@@ -359,7 +359,7 @@ import (
 	"context"
 	"testing"
 
-	"git.nobla.cn/golang/rest/query"
+	"git.nobla.cn/golang/rest/v3/query"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )

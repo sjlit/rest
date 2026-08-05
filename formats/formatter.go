@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"git.nobla.cn/golang/rest/schema"
+	"git.nobla.cn/golang/rest/v3/schema"
 	"gorm.io/gorm"
 )
 

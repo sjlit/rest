@@ -3,7 +3,7 @@ package rest
 import (
 	"context"
 
-	"git.nobla.cn/golang/rest/schema"
+	"git.nobla.cn/golang/rest/v3/schema"
 )
 
 type scopeKey struct{}

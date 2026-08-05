@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"git.nobla.cn/golang/rest/schema"
+	"git.nobla.cn/golang/rest/v3/schema"
 )
 
 // TestRespondErrorCodeMapping 验证 Respond 会按 error 类型映射状态码，

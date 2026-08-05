@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"git.nobla.cn/golang/rest/schema"
+	"git.nobla.cn/golang/rest/v3/schema"
 )
 
 func TestStringFormat(t *testing.T) {

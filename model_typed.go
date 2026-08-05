@@ -3,7 +3,7 @@ package rest
 import (
 	"context"
 
-	"git.nobla.cn/golang/rest/query"
+	"git.nobla.cn/golang/rest/v3/query"
 )
 
 // TypedModel 是编译期类型安全的模型包装, 内部委托给动态核心 Model。

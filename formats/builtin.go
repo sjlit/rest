@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"git.nobla.cn/golang/rest/schema"
+	"git.nobla.cn/golang/rest/v3/schema"
 )
 
 func stringFormat(ctx context.Context, value any, model any, scm schema.Schema) any {

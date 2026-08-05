@@ -23,7 +23,7 @@
 ### 安装
 
 ```bash
-go get git.nobla.cn/golang/rest
+go get git.nobla.cn/golang/rest/v3
 ```
 
 ### 基础示例
@@ -35,9 +35,9 @@ import (
     "context"
     "fmt"
 
-    "git.nobla.cn/golang/rest"
-    "git.nobla.cn/golang/rest/query"
-    "git.nobla.cn/golang/rest/schema"
+    "git.nobla.cn/golang/rest/v3"
+    "git.nobla.cn/golang/rest/v3/query"
+    "git.nobla.cn/golang/rest/v3/schema"
     "gorm.io/driver/sqlite"
     "gorm.io/gorm"
 )

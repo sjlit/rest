@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"git.nobla.cn/golang/rest/query"
-	"git.nobla.cn/golang/rest/schema"
+	"git.nobla.cn/golang/rest/v3/query"
+	"git.nobla.cn/golang/rest/v3/schema"
 )
 
 func TestBuildQuerySkipsMalformedSort(t *testing.T) {
