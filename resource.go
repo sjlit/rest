@@ -43,6 +43,10 @@ type ResourceConfig struct {
 	UserResolve   ResolveUserFunc
 }
 
+func (r *Resource) BuildUri(scenario string) (method string, uri string) {
+	return r.buildUri(scenario)
+}
+
 func (r *Resource) buildUri(scenario string) (method string, uri string) {
 	switch scenario {
 	case schema.ScenarioCreate:
