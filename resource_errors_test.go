@@ -163,3 +163,56 @@ func TestFindPrimaryKeyHandlesTrailingSlash(t *testing.T) {
 		t.Errorf("want empty for too-short path, got %q", got)
 	}
 }
+
+// TestFindPrimaryKeyHandlesEdgeCases 覆盖剩余的边界场景:
+//   - prefix 为空时 fullUri 不带 leading "/", Path 仍需正确解析
+//   - 请求 path 比模板多一段(附加子路径), 走 Path 2 回退也应命中
+//   - request path 短于模板(不带 id)且没匹配到前缀时, 返回空
+func TestFindPrimaryKeyHandlesEdgeCases(t *testing.T) {
+	db := setupDynamicTestDB(t)
+	m, err := NewModel(&dynUser{}, WithDB(db), WithModuleName("dyn"))
+	if err != nil {
+		t.Fatalf("NewModel: %v", err)
+	}
+	// 用 NewRequestWithContext 走完路径解析, 再手工覆盖 URL.Path,
+	// 这样可以模拟 prefix 与 path 形态不齐的极端输入。
+	newReq := func(path string) *http.Request {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.URL.Path = path
+		return req
+	}
+	cases := []struct {
+		name   string
+		prefix string
+		path   string
+		want   string
+	}{
+		{
+			name:   "empty prefix, request path still absolute",
+			prefix: "",
+			path:   "/dyn/dyn_user/detail/42",
+			want:   "42",
+		},
+		{
+			name:   "extra trailing segment falls back via prefix strip",
+			prefix: "/api/v1",
+			path:   "/api/v1/dyn/dyn_user/detail/42/extra/sub",
+			want:   "42",
+		},
+		{
+			name:   "path shorter than template, no prefix match",
+			prefix: "/api/v1",
+			path:   "/api/v1/dyn",
+			want:   "",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &Resource{prefix: tc.prefix, model: m}
+			got := r.findPrimaryKey(newReq(tc.path), schema.ScenarioDetail)
+			if got != tc.want {
+				t.Errorf("want %q, got %q", tc.want, got)
+			}
+		})
+	}
+}

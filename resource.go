@@ -163,8 +163,8 @@ func (r *Resource) buildQuery(req *http.Request, schemas []schema.Schema) *query
 func (r *Resource) findPrimaryKey(req *http.Request, scenario string) string {
 	_, fullUri := r.buildUri(scenario)
 	// 1) 精确匹配（含 :id）：直接按段对比
-	fullParts := strings.Split(strings.TrimSuffix(fullUri, "/"), "/")
-	reqParts := strings.Split(strings.TrimSuffix(req.URL.Path, "/"), "/")
+	fullParts := strings.Split(strings.TrimPrefix(strings.TrimSuffix(fullUri, "/"), "/"), "/")
+	reqParts := strings.Split(strings.TrimPrefix(strings.TrimSuffix(req.URL.Path, "/"), "/"), "/")
 	if len(fullParts) == len(reqParts) {
 		for i, part := range fullParts {
 			if strings.HasPrefix(part, ":") {
@@ -172,9 +172,15 @@ func (r *Resource) findPrimaryKey(req *http.Request, scenario string) string {
 			}
 		}
 	}
-	// 2) 回退：以 fullUri 前缀截断 path，取首段非空值
-	//    处理请求 path 多/少一段或带尾斜杠等边界情况。
-	if trimmed, ok := strings.CutPrefix(req.URL.Path, fullUri); ok {
+	// 2) 回退：去掉模板末尾的参数段后再做前缀截断，
+	//    处理请求 path 比模板多一段(例如附加子路径)的边界情况。
+	//    注意：不能用 fullUri 原串直接 CutPrefix，因为模板里的 ":id"
+	//    是字面量，真实请求永远不会以 ":id" 结尾。
+	prefix := fullUri
+	if i := strings.LastIndex(prefix, "/:"); i >= 0 {
+		prefix = prefix[:i]
+	}
+	if trimmed, ok := strings.CutPrefix(req.URL.Path, prefix); ok {
 		trimmed = strings.TrimPrefix(trimmed, "/")
 		if i := strings.IndexByte(trimmed, '/'); i >= 0 {
 			trimmed = trimmed[:i]
