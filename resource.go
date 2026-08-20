@@ -388,20 +388,26 @@ func (r *Resource) Detail(res http.ResponseWriter, req *http.Request) {
 		modelValue   any
 		valueFormat  string
 		runtimeScope *RuntimeScope
+		scenario     string
 	)
+	// 允许通过 ?scenario= 覆盖默认渲染场景；非法或缺省时回退到 detail。
+	scenario = req.URL.Query().Get(QueryParamScenario)
+	if !schema.IsValidScenario(scenario) {
+		scenario = schema.ScenarioDetail
+	}
 	if runtimeScope, err = r.getRuntimeScope(req); err != nil {
 		r.Respond(res, req, ErrUnavailable)
 		return
 	}
-	runtimeScope.Scenario = schema.ScenarioDetail
+	runtimeScope.Scenario = scenario
 	ctx := WithRuntimeScope(req.Context(), runtimeScope)
-	if schemas, err = schema.GetVisibleSchemas(ctx, r.model.GetDB(), r.model.GetNaming().ModuleName, r.model.GetNaming().TableName, schema.ScenarioDetail); err != nil {
+	if schemas, err = schema.GetVisibleSchemas(ctx, r.model.GetDB(), r.model.GetNaming().ModuleName, r.model.GetNaming().TableName, scenario); err != nil {
 		r.Respond(res, req, ErrUnavailable)
 		return
 	}
 	runtimeScope.Schemas = schemas
 	valueFormat = req.URL.Query().Get(QueryParamFormat)
-	if modelValue, err = r.model.Detail(ctx, r.findPrimaryKey(req, schema.ScenarioDetail)); err != nil {
+	if modelValue, err = r.model.Detail(ctx, r.findPrimaryKey(req, scenario)); err != nil {
 		// 框架未命中的"未找到"统一映射成 ErrRecordNotFound（404）；
 		// 其它 DB/业务错误按原样上抛，由 Respond 映射状态码。
 		if errors.Is(err, gorm.ErrRecordNotFound) {

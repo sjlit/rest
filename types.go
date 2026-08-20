@@ -12,6 +12,7 @@ const (
 	QueryParamPageSize = "page_size"
 	QueryParamSort     = "sort"
 	QueryParamFormat   = "__format"
+	QueryParamScenario = "scenario"
 )
 
 type (

@@ -39,6 +39,18 @@ const (
 	ScenarioDetail = "detail"
 )
 
+// IsValidScenario 报告 s 是否为已识别的 scenario 常量。
+// 用于在 HTTP query 参数等外部入口校验传入值，未命中时调用方应回退到默认 scenario。
+func IsValidScenario(s string) bool {
+	switch s {
+	case ScenarioCreate, ScenarioUpdate, ScenarioDelete,
+		ScenarioSearch, ScenarioExport, ScenarioImport,
+		ScenarioList, ScenarioDetail:
+		return true
+	}
+	return false
+}
+
 const (
 	MatchExactly = "exactly" //精确匹配
 	MatchFuzzy   = "fuzzy"   //模糊匹配
